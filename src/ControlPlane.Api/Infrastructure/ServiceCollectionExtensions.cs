@@ -1,6 +1,12 @@
 using System.Reflection;
+using ControlPlane.Azure;
 using ControlPlane.Core.Interfaces;
 using ControlPlane.Core.Plugins;
+using ControlPlane.DevOps;
+using ControlPlane.Kafka;
+using ControlPlane.ServiceBus;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ControlPlane.Api.Infrastructure;
 
@@ -8,8 +14,14 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddControlPlanePlugins(
         this IServiceCollection services,
+        IConfiguration configuration,
         params Assembly[] assemblies)
     {
+        services.Configure<AzureSettings>(configuration.GetSection(AzureSettings.SectionName));
+        services.Configure<ServiceBusSettings>(configuration.GetSection(ServiceBusSettings.SectionName));
+        services.Configure<KafkaSettings>(configuration.GetSection(KafkaSettings.SectionName));
+        services.Configure<DevOpsSettings>(configuration.GetSection(DevOpsSettings.SectionName));
+
         var pluginTypes = assemblies
             .SelectMany(assembly => assembly.DefinedTypes)
             .Where(type =>

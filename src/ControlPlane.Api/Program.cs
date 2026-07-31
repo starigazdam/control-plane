@@ -5,9 +5,19 @@ using ControlPlane.Azure;
 using ControlPlane.DevOps;
 using ControlPlane.Kafka;
 using ControlPlane.ServiceBus;
+using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Load .env from the repo root (two levels up from the published working dir)
+var envFile = Path.Combine(builder.Environment.ContentRootPath, ".env");
+if (!File.Exists(envFile))
+    envFile = Path.Combine(builder.Environment.ContentRootPath, "..", ".env");
+if (File.Exists(envFile))
+    Env.Load(envFile, new LoadOptions(setEnvVars: true));
+
+builder.Configuration.AddEnvironmentVariables();
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -15,6 +25,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControlPlanePlugins(
+    builder.Configuration,
     typeof(AzurePlugin).Assembly,
     typeof(KafkaPlugin).Assembly,
     typeof(DevOpsPlugin).Assembly,

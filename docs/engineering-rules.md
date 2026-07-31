@@ -1,7 +1,7 @@
 # Control Plane Engineering Rules
 
 ## Vertical delivery standard
-1. Every vertical must include end-to-end test coverage before it is considered complete.
+1. Every vertical or feature slice must include end-to-end test coverage before it is considered complete.
 2. A vertical is complete only when observe + act behavior is verified through realistic integration flow (status + operation execution path).
 
 ## End-to-end testing approach

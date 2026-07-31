@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "W3HJ6P9TZQwHPiFQs1BEKec/YdhOK7oOeTybnyHkqOU=",
+  "Source": "ControlPlane.Api",
+  "BasePath": "_content/ControlPlane.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

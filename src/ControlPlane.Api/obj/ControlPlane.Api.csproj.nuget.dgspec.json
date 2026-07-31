@@ -1,0 +1,437 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Api\\ControlPlane.Api.csproj": {}
+  },
+  "projects": {
+    "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Api\\ControlPlane.Api.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Api\\ControlPlane.Api.csproj",
+        "projectName": "ControlPlane.Api",
+        "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Api\\ControlPlane.Api.csproj",
+        "packagesPath": "C:\\Users\\a00569160\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Api\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\a00569160\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://pkgs.dev.azure.com/atlascopco-ctba/OnePortal/_packaging/AtlasCopcoOnePortalEcommerceNuget/nuget/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Azure\\ControlPlane.Azure.csproj": {
+                "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Azure\\ControlPlane.Azure.csproj"
+              },
+              "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj": {
+                "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj"
+              },
+              "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.DevOps\\ControlPlane.DevOps.csproj": {
+                "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.DevOps\\ControlPlane.DevOps.csproj"
+              },
+              "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Kafka\\ControlPlane.Kafka.csproj": {
+                "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Kafka\\ControlPlane.Kafka.csproj"
+              },
+              "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.ServiceBus\\ControlPlane.ServiceBus.csproj": {
+                "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.ServiceBus\\ControlPlane.ServiceBus.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.EntityFrameworkCore.Sqlite": {
+              "target": "Package",
+              "version": "[8.0.8, )"
+            },
+            "Swashbuckle.AspNetCore": {
+              "target": "Package",
+              "version": "[6.6.2, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.AspNetCore.App": {
+              "privateAssets": "none"
+            },
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.423/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Azure\\ControlPlane.Azure.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Azure\\ControlPlane.Azure.csproj",
+        "projectName": "ControlPlane.Azure",
+        "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Azure\\ControlPlane.Azure.csproj",
+        "packagesPath": "C:\\Users\\a00569160\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Azure\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\a00569160\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://pkgs.dev.azure.com/atlascopco-ctba/OnePortal/_packaging/AtlasCopcoOnePortalEcommerceNuget/nuget/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj": {
+                "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.423/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj",
+        "projectName": "ControlPlane.Core",
+        "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj",
+        "packagesPath": "C:\\Users\\a00569160\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\a00569160\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://pkgs.dev.azure.com/atlascopco-ctba/OnePortal/_packaging/AtlasCopcoOnePortalEcommerceNuget/nuget/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.423/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.DevOps\\ControlPlane.DevOps.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.DevOps\\ControlPlane.DevOps.csproj",
+        "projectName": "ControlPlane.DevOps",
+        "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.DevOps\\ControlPlane.DevOps.csproj",
+        "packagesPath": "C:\\Users\\a00569160\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.DevOps\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\a00569160\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://pkgs.dev.azure.com/atlascopco-ctba/OnePortal/_packaging/AtlasCopcoOnePortalEcommerceNuget/nuget/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj": {
+                "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.423/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Kafka\\ControlPlane.Kafka.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Kafka\\ControlPlane.Kafka.csproj",
+        "projectName": "ControlPlane.Kafka",
+        "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Kafka\\ControlPlane.Kafka.csproj",
+        "packagesPath": "C:\\Users\\a00569160\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Kafka\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\a00569160\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://pkgs.dev.azure.com/atlascopco-ctba/OnePortal/_packaging/AtlasCopcoOnePortalEcommerceNuget/nuget/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj": {
+                "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.423/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.ServiceBus\\ControlPlane.ServiceBus.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.ServiceBus\\ControlPlane.ServiceBus.csproj",
+        "projectName": "ControlPlane.ServiceBus",
+        "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.ServiceBus\\ControlPlane.ServiceBus.csproj",
+        "packagesPath": "C:\\Users\\a00569160\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.ServiceBus\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\a00569160\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://pkgs.dev.azure.com/atlascopco-ctba/OnePortal/_packaging/AtlasCopcoOnePortalEcommerceNuget/nuget/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj": {
+                "projectPath": "C:\\Users\\a00569160\\WorkAI\\control-plane\\src\\ControlPlane.Core\\ControlPlane.Core.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.423/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

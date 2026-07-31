@@ -1,0 +1,16 @@
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\bin\Debug\net8.0\ControlPlane.Azure.deps.json
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\bin\Debug\net8.0\ControlPlane.Azure.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\bin\Debug\net8.0\ControlPlane.Azure.pdb
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\bin\Debug\net8.0\ControlPlane.Core.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\bin\Debug\net8.0\ControlPlane.Core.pdb
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\obj\Debug\net8.0\ControlPlane.Azure.csproj.AssemblyReference.cache
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\obj\Debug\net8.0\ControlPlane.Azure.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\obj\Debug\net8.0\ControlPlane.Azure.AssemblyInfoInputs.cache
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\obj\Debug\net8.0\ControlPlane.Azure.AssemblyInfo.cs
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\obj\Debug\net8.0\ControlPlane.Azure.csproj.CoreCompileInputs.cache
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\obj\Debug\net8.0\ControlPlane.Azure.sourcelink.json
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\obj\Debug\net8.0\ControlP.98DA139E.Up2Date
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\obj\Debug\net8.0\ControlPlane.Azure.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\obj\Debug\net8.0\refint\ControlPlane.Azure.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\obj\Debug\net8.0\ControlPlane.Azure.pdb
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Azure\obj\Debug\net8.0\ref\ControlPlane.Azure.dll

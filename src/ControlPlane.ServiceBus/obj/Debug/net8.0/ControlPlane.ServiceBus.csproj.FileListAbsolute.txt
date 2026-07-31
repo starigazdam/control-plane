@@ -1,0 +1,16 @@
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\bin\Debug\net8.0\ControlPlane.ServiceBus.deps.json
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\bin\Debug\net8.0\ControlPlane.ServiceBus.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\bin\Debug\net8.0\ControlPlane.ServiceBus.pdb
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\bin\Debug\net8.0\ControlPlane.Core.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\bin\Debug\net8.0\ControlPlane.Core.pdb
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\obj\Debug\net8.0\ControlPlane.ServiceBus.csproj.AssemblyReference.cache
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\obj\Debug\net8.0\ControlPlane.ServiceBus.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\obj\Debug\net8.0\ControlPlane.ServiceBus.AssemblyInfoInputs.cache
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\obj\Debug\net8.0\ControlPlane.ServiceBus.AssemblyInfo.cs
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\obj\Debug\net8.0\ControlPlane.ServiceBus.csproj.CoreCompileInputs.cache
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\obj\Debug\net8.0\ControlPlane.ServiceBus.sourcelink.json
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\obj\Debug\net8.0\ControlP.83B4EB66.Up2Date
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\obj\Debug\net8.0\ControlPlane.ServiceBus.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\obj\Debug\net8.0\refint\ControlPlane.ServiceBus.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\obj\Debug\net8.0\ControlPlane.ServiceBus.pdb
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.ServiceBus\obj\Debug\net8.0\ref\ControlPlane.ServiceBus.dll

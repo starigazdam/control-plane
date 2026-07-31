@@ -1,0 +1,12 @@
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\bin\Debug\net8.0\ControlPlane.Core.deps.json
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\bin\Debug\net8.0\ControlPlane.Core.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\bin\Debug\net8.0\ControlPlane.Core.pdb
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\obj\Debug\net8.0\ControlPlane.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\obj\Debug\net8.0\ControlPlane.Core.AssemblyInfoInputs.cache
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\obj\Debug\net8.0\ControlPlane.Core.AssemblyInfo.cs
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\obj\Debug\net8.0\ControlPlane.Core.csproj.CoreCompileInputs.cache
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\obj\Debug\net8.0\ControlPlane.Core.sourcelink.json
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\obj\Debug\net8.0\ControlPlane.Core.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\obj\Debug\net8.0\refint\ControlPlane.Core.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\obj\Debug\net8.0\ControlPlane.Core.pdb
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Core\obj\Debug\net8.0\ref\ControlPlane.Core.dll

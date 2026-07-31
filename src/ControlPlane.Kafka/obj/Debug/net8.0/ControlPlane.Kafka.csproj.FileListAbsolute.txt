@@ -1,0 +1,16 @@
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\bin\Debug\net8.0\ControlPlane.Kafka.deps.json
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\bin\Debug\net8.0\ControlPlane.Kafka.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\bin\Debug\net8.0\ControlPlane.Kafka.pdb
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\bin\Debug\net8.0\ControlPlane.Core.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\bin\Debug\net8.0\ControlPlane.Core.pdb
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\obj\Debug\net8.0\ControlPlane.Kafka.csproj.AssemblyReference.cache
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\obj\Debug\net8.0\ControlPlane.Kafka.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\obj\Debug\net8.0\ControlPlane.Kafka.AssemblyInfoInputs.cache
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\obj\Debug\net8.0\ControlPlane.Kafka.AssemblyInfo.cs
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\obj\Debug\net8.0\ControlPlane.Kafka.csproj.CoreCompileInputs.cache
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\obj\Debug\net8.0\ControlPlane.Kafka.sourcelink.json
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\obj\Debug\net8.0\ControlP.3EA55829.Up2Date
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\obj\Debug\net8.0\ControlPlane.Kafka.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\obj\Debug\net8.0\refint\ControlPlane.Kafka.dll
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\obj\Debug\net8.0\ControlPlane.Kafka.pdb
+C:\Users\a00569160\WorkAI\control-plane\src\ControlPlane.Kafka\obj\Debug\net8.0\ref\ControlPlane.Kafka.dll

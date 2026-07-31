@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="ControlPlane.Core\ControlPlane.Core.csproj" />
+  <Project Path="ControlPlane.Api\ControlPlane.Api.csproj" />
+  <Project Path="ControlPlane.Azure\ControlPlane.Azure.csproj" />
+  <Project Path="ControlPlane.Kafka\ControlPlane.Kafka.csproj" />
+  <Project Path="ControlPlane.DevOps\ControlPlane.DevOps.csproj" />
+  <Project Path="ControlPlane.ServiceBus\ControlPlane.ServiceBus.csproj" />
+</Solution>

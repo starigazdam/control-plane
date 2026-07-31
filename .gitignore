@@ -1,5 +1,5 @@
-# Secrets
-.env
+# Local secrets (overrides .env — never commit)
+.env.local
 
 # .NET build output
 src/**/bin/

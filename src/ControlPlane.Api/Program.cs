@@ -10,12 +10,16 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Load .env from the repo root (two levels up from the published working dir)
-var envFile = Path.Combine(builder.Environment.ContentRootPath, ".env");
-if (!File.Exists(envFile))
-    envFile = Path.Combine(builder.Environment.ContentRootPath, "..", ".env");
-if (File.Exists(envFile))
-    Env.Load(envFile, new LoadOptions(setEnvVars: true));
+// Load .env (committed defaults), then .env.local (local overrides, gitignored)
+var root = builder.Environment.ContentRootPath;
+foreach (var name in new[] { ".env", ".env.local" })
+{
+    var path = Path.Combine(root, name);
+    if (!File.Exists(path))
+        path = Path.Combine(root, "..", name);
+    if (File.Exists(path))
+        Env.Load(path, new LoadOptions(setEnvVars: true));
+}
 
 builder.Configuration.AddEnvironmentVariables();
 

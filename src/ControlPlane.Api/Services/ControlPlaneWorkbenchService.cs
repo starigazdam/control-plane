@@ -134,7 +134,7 @@ public sealed class ControlPlaneWorkbenchService
         var limitedTake = Math.Clamp(take, 1, 200);
         var entries = await _dbContext.OperationExecutions
             .AsNoTracking()
-            .OrderByDescending(execution => execution.RequestedAtUtc)
+            .OrderByDescending(execution => execution.Id)
             .Take(limitedTake)
             .ToListAsync(cancellationToken);
 

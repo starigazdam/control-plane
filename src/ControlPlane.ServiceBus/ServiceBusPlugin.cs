@@ -11,6 +11,7 @@ public sealed class ServiceBusPlugin : IControlPlanePlugin
     public void Register(IPluginRegistration registration)
     {
         registration.AddStatusProvider<ServiceBusDlqStatusProvider>();
+        registration.AddOperation<ResendServiceBusDlqToQueueOperation>();
         registration.AddOperation<ReplayServiceBusDlqOperation>();
         registration.AddOperation<PurgeServiceBusQueueOperation>();
     }

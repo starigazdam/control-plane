@@ -10,4 +10,5 @@
   <Project Path="ControlPlane.ServiceBus\ControlPlane.ServiceBus.csproj" />
   <Project Path="ControlPlane.CopilotAgent\ControlPlane.CopilotAgent.csproj" />
   <Project Path="ControlPlane.ServiceDefaults/ControlPlane.ServiceDefaults.csproj" />
+  <Project Path="..\tests\ControlPlane.Api.E2E\ControlPlane.Api.E2E.csproj" />
 </Solution>

@@ -11,6 +11,7 @@ using ControlPlane.ServiceBus;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
@@ -47,7 +48,12 @@ builder.Configuration.AddEnvironmentVariables();
 builder.Services.Configure<ProjectSettings>(builder.Configuration.GetSection(ProjectSettings.SectionName));
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -85,6 +91,7 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    app.UseDeveloperExceptionPage();
     app.UseSwagger();
     app.UseSwaggerUI();
 }

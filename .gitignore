@@ -2,11 +2,9 @@
 .env.local
 .env.*.local
 
-# .NET build output
+# .NET build output (each project writes to its own bin/ and obj/)
 [Bb]in/
 [Oo]bj/
-[Dd]ebug/
-[Rr]elease/
 *.user
 
 # .NET test artifacts

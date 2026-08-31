@@ -17,7 +17,7 @@
 - UI checks: `npm run lint --prefix ui` and `npm run build --prefix ui`
 - Both dev servers on Windows: `run\run.ps1`
 
-Put local configuration in `.env.local`; leave the tracked `.env` as placeholders.
+Put local configuration in `.env.local`; leave the tracked `.env` as placeholders. Because `.env` is tracked, `.gitignore` cannot protect it — confirm the repository has **secret scanning with push protection** enabled (see [SECURITY.md](SECURITY.md)) so a real value pushed into `.env` is blocked.
 
 ## Quality gates
 
@@ -27,7 +27,7 @@ Put local configuration in `.env.local`; leave the tracked `.env` as placeholder
 | --- | --- |
 | .NET restore | `dotnet restore src/ControlPlane.slnx` |
 | .NET build | `dotnet build src/ControlPlane.slnx --configuration Release` |
-| .NET test | `dotnet test src/ControlPlane.slnx` — runs only when a test project exists; the repository has none yet, so this step reports as skipped |
+| .NET test | `dotnet test` on each `.csproj` that references `Microsoft.NET.Test.Sdk` — the repository has none yet, so the real **Test** step shows as *skipped* while a separate **Skip test** step passes and emits an explanatory notice |
 | UI install | `npm ci` in `ui/` |
 | UI lint | `npm run lint` in `ui/` (oxlint) |
 | UI build | `npm run build` in `ui/` (`tsc -b && vite build`) |

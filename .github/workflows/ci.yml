@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: .NET
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore src/ControlPlane.slnx
+
+      - name: Build
+        run: dotnet build src/ControlPlane.slnx --configuration Release --no-restore
+
+      # The repository has no test projects yet; the test step turns itself on
+      # as soon as one is added.
+      - name: Detect test projects
+        id: detect
+        run: |
+          if git ls-files '*.csproj' | xargs -r grep -l 'Microsoft.NET.Test.Sdk' | grep -q .; then
+            echo 'found=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'found=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Test
+        if: steps.detect.outputs.found == 'true'
+        run: dotnet test src/ControlPlane.slnx --configuration Release --no-build
+
+      - name: Skip test
+        if: steps.detect.outputs.found != 'true'
+        run: echo '::notice::No .NET test project found; dotnet test skipped.'
+
+  ui:
+    name: UI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

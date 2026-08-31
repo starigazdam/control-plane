@@ -21,11 +21,23 @@ A pluggable engineering workbench for operational visibility and one-click actio
 - `ui/` - React frontend
 - `docs/` - engineering rules and plugin guidance
 - `run/` - local startup scripts
+- `.github/` - CI workflow and dependency update configuration
 
 ## Local run
 
-1. Install dependencies in `ui/`.
+1. Install dependencies: `npm ci --prefix ui`.
 2. Run `run\run.ps1`.
+
+Configuration defaults live in the tracked `.env` (placeholders only). Put local values in `.env.local`, which is gitignored.
+
+## Quality gates
+
+CI runs on every pull request and on pushes to `develop`:
+
+- .NET: `dotnet restore` and `dotnet build` for `src/ControlPlane.slnx`. `dotnet test` runs only once a test project exists - there is none yet.
+- UI: `npm ci`, `npm run lint`, and `npm run build` in `ui/`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and [SECURITY.md](SECURITY.md) for public-repository and vulnerability-reporting rules.
 
 ## Rules
 
@@ -34,9 +46,10 @@ A pluggable engineering workbench for operational visibility and one-click actio
 - Verify the full observe + act loop.
 - Build production-intent slices, not MVP shortcuts.
 - Use a separate feature branch + worktree for GitHub issues, and require human PR approval before merge.
+- Keep every public artifact generic: no credentials, environment topology, or internal references.
 
 ## Plugin guidance
 
 - Keep operations explicit and opinionated.
 - Add runnable `.http` examples for plugin endpoints.
-- Load secrets from `.env`.
+- Load configuration from `.env`; keep real secrets in `.env.local`.

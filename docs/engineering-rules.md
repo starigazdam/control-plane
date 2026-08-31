@@ -5,3 +5,5 @@
 - Verify the full observe + act loop.
 - Build production-intent slices, not MVP shortcuts.
 - For GitHub issues, use a separate feature branch + worktree and require human PR approval before merge.
+- CI must be green before merge: .NET restore/build (tests run once test projects exist) and UI install/lint/build.
+- Keep every public artifact generic: no credentials, environment topology, or internal references — see `SECURITY.md`.

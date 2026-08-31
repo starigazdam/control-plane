@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directories:
+      - /src/ControlPlane.Api
+      - /src/ControlPlane.Azure
+      - /src/ControlPlane.Core
+      - /src/ControlPlane.DevOps
+      - /src/ControlPlane.Kafka
+      - /src/ControlPlane.ServiceBus
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /ui
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

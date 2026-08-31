@@ -1,9 +1,30 @@
 # Local secrets (overrides .env — never commit)
 .env.local
+.env.*.local
 
-# .NET build output
-src/**/bin/
-src/**/obj/
+# .NET build output (each project writes to its own bin/ and obj/)
+[Bb]in/
+[Oo]bj/
+*.user
+
+# .NET test artifacts
+[Tt]est[Rr]esults/
+*.trx
+*.coverage
+coverage*.json
+coverage*.xml
+
+# UI build output and dependencies
+node_modules/
+dist/
+dist-ssr/
+
+# Local databases and runtime data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
 
 # OS
 .DS_Store

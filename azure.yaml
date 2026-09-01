@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+name: control-plane
+metadata:
+  template: control-plane-aspire
+services:
+  apphost:
+    project: ./src/ControlPlane.AppHost/ControlPlane.AppHost.csproj
+    language: dotnet
+    host: containerapp

@@ -1,6 +1,7 @@
 using Projects;
 
 var builder = DistributedApplication.CreateBuilder(args);
+builder.AddAzureContainerAppEnvironment("aca-env");
 
 var postgres = builder
     .AddPostgres("postgres")
@@ -20,9 +21,17 @@ var api = builder
     .WaitFor(controlPlaneDb)
     .WaitFor(serviceBus);
 
-builder
+var ui = builder
     .AddViteApp("ui", "../../ui")
-    .WithReference(api)
-    .WithExternalHttpEndpoints();
+    .WithReference(api);
+
+builder
+    .AddYarp("web")
+    .WithExternalHttpEndpoints()
+    .WithConfiguration(config =>
+    {
+        config.AddRoute("/api/{**catch-all}", api);
+    })
+    .PublishWithStaticFiles(ui);
 
 builder.Build().Run();

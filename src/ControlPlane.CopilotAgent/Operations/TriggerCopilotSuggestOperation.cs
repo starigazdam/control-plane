@@ -43,7 +43,7 @@ public sealed class TriggerCopilotSuggestOperation : IOperation
             new OperationParameter(
                 Name: "prompt",
                 DisplayName: "Task description",
-                Description: "Describe the backend task or problem you want Copilot to suggest a command for.",
+                Description: $"Describe the backend task or problem you want Copilot to suggest a command for. Maximum {OperationHelpers.MaxInputLength} characters.",
                 IsRequired: true,
                 Type: "string",
                 DefaultValue: null)
@@ -66,6 +66,10 @@ public sealed class TriggerCopilotSuggestOperation : IOperation
         {
             errors.Add("The 'prompt' parameter is required.");
         }
+        else if (prompt.Length > OperationHelpers.MaxInputLength)
+        {
+            errors.Add($"The 'prompt' parameter exceeds the maximum length of {OperationHelpers.MaxInputLength} characters.");
+        }
 
         return Task.FromResult<IReadOnlyList<string>>(errors);
     }
@@ -75,7 +79,17 @@ public sealed class TriggerCopilotSuggestOperation : IOperation
         CancellationToken cancellationToken)
     {
         var startedAt = DateTimeOffset.UtcNow;
-        var prompt = context.Request.Input["prompt"]!;
+
+        if (!context.Request.Input.TryGetValue("prompt", out var prompt) || string.IsNullOrWhiteSpace(prompt))
+        {
+            return new OperationExecutionResult(
+                Status: OperationExecutionStatus.Rejected,
+                Message: "The 'prompt' parameter is missing.",
+                StartedAtUtc: startedAt,
+                CompletedAtUtc: DateTimeOffset.UtcNow,
+                ErrorCode: "missing_parameter",
+                Output: new Dictionary<string, string?>());
+        }
 
         var result = await _runner.SuggestAsync(prompt, cancellationToken);
 
@@ -96,14 +110,11 @@ public sealed class TriggerCopilotSuggestOperation : IOperation
         return new OperationExecutionResult(
             Status: result.Succeeded ? OperationExecutionStatus.Succeeded : OperationExecutionStatus.Failed,
             Message: result.Succeeded
-                ? $"Copilot suggested a command for: \"{TruncateForMessage(prompt)}\"."
+                ? $"Copilot suggested a command for: \"{OperationHelpers.TruncateForMessage(prompt)}\"."
                 : $"Copilot CLI failed (exit code {result.ExitCode}).",
             StartedAtUtc: startedAt,
             CompletedAtUtc: DateTimeOffset.UtcNow,
             ErrorCode: result.Succeeded ? null : "copilot_cli_error",
             Output: output);
     }
-
-    private static string TruncateForMessage(string value, int maxLength = 80) =>
-        value.Length <= maxLength ? value : value[..maxLength] + "…";
 }

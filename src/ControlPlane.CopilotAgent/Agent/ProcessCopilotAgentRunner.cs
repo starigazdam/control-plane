@@ -7,6 +7,12 @@ namespace ControlPlane.CopilotAgent.Agent;
 /// <summary>
 /// Shells out to <c>gh copilot</c> (or a configured path) to fulfil agent requests.
 /// Each invocation is a separate process and is bounded by <see cref="CopilotAgentSettings.TimeoutSeconds"/>.
+///
+/// <para><strong>CliPath note:</strong> the configured <see cref="CopilotAgentSettings.CliPath"/>
+/// is split on the first space only to separate the executable from the base arguments
+/// (e.g. <c>"gh copilot"</c> → executable=<c>"gh"</c>, base-arg=<c>"copilot"</c>).
+/// Paths containing spaces must be quoted or the executable separated from its
+/// arguments using the <c>CopilotAgent__CliPath</c> convention.</para>
 /// </summary>
 public sealed class ProcessCopilotAgentRunner : ICopilotAgentRunner
 {
@@ -21,32 +27,55 @@ public sealed class ProcessCopilotAgentRunner : ICopilotAgentRunner
         _logger = logger;
     }
 
+    /// <inheritdoc/>
+    public Task<AgentInvocationResult> ProbeAsync(CancellationToken cancellationToken)
+    {
+        // "gh --version" (no copilot subcommand) returns exit 0 and prints the gh version
+        // when the CLI is installed and on PATH. We cannot use "gh copilot --version"
+        // because the Copilot extension treats positional arguments as the text to explain.
+        var parts = _settings.CliPath.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        var executable = parts[0];
+        return RunAsync(executable, ["--version"], cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public Task<AgentInvocationResult> SuggestAsync(
         string prompt,
         CancellationToken cancellationToken)
     {
         // gh copilot suggest accepts the prompt as a positional argument.
         // --target shell is the default mode that returns a runnable command.
-        return RunAsync(["suggest", "--target", "shell", prompt], cancellationToken);
+        return RunCliAsync(["suggest", "--target", "shell", prompt], cancellationToken);
     }
 
+    /// <inheritdoc/>
     public Task<AgentInvocationResult> ExplainAsync(
         string subject,
         CancellationToken cancellationToken)
     {
-        return RunAsync(["explain", subject], cancellationToken);
+        return RunCliAsync(["explain", subject], cancellationToken);
     }
 
-    private async Task<AgentInvocationResult> RunAsync(
-        IReadOnlyList<string> arguments,
+    /// <summary>Runs the configured CLI with <paramref name="subcommandArgs"/> appended.</summary>
+    private Task<AgentInvocationResult> RunCliAsync(
+        IReadOnlyList<string> subcommandArgs,
         CancellationToken cancellationToken)
     {
         // Split "gh copilot" → executable="gh", base-args=["copilot"]
         var parts = _settings.CliPath.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var executable = parts[0];
-        var baseArgs = parts.Length > 1 ? parts[1..] : [];
-        var allArgs = baseArgs.Concat(arguments).ToArray();
+        var allArgs = parts.Length > 1
+            ? parts[1..].Concat(subcommandArgs).ToArray()
+            : subcommandArgs.ToArray();
 
+        return RunAsync(executable, allArgs, cancellationToken);
+    }
+
+    private async Task<AgentInvocationResult> RunAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken)
+    {
         var startInfo = new ProcessStartInfo
         {
             FileName = executable,
@@ -61,7 +90,7 @@ public sealed class ProcessCopilotAgentRunner : ICopilotAgentRunner
             startInfo.WorkingDirectory = _settings.WorkingDirectory;
         }
 
-        foreach (var arg in allArgs)
+        foreach (var arg in arguments)
         {
             startInfo.ArgumentList.Add(arg);
         }
@@ -90,7 +119,7 @@ public sealed class ProcessCopilotAgentRunner : ICopilotAgentRunner
                 "Copilot CLI exited with code {ExitCode} after {Duration}ms. Args: [{Args}]",
                 process.ExitCode,
                 stopwatch.ElapsedMilliseconds,
-                string.Join(", ", allArgs));
+                string.Join(", ", arguments));
 
             return new AgentInvocationResult(
                 Succeeded: process.ExitCode == 0,
@@ -108,7 +137,7 @@ public sealed class ProcessCopilotAgentRunner : ICopilotAgentRunner
             _logger.LogWarning(
                 "Copilot CLI timed out after {TimeoutSeconds}s. Args: [{Args}]",
                 _settings.TimeoutSeconds,
-                string.Join(", ", allArgs));
+                string.Join(", ", arguments));
 
             return new AgentInvocationResult(
                 Succeeded: false,

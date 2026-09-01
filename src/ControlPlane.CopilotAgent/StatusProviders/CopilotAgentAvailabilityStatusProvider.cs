@@ -8,7 +8,7 @@ namespace ControlPlane.CopilotAgent.StatusProviders;
 
 /// <summary>
 /// Checks whether the Copilot CLI is reachable and authenticated by running
-/// <c>gh copilot --version</c> (or equivalent) as a lightweight probe.
+/// <c>gh --version</c> as a lightweight, non-interactive probe.
 /// Surfaces a <see cref="StatusLevel.Warning"/> when the plugin is disabled
 /// or the CLI is unreachable, so the state is always visible on the overview page.
 /// </summary>
@@ -55,13 +55,18 @@ public sealed class CopilotAgentAvailabilityStatusProvider : IStatusProvider
 
         try
         {
-            // Use explain as a lightweight liveness probe — it's non-destructive and
-            // requires the CLI to be present and authenticated.
-            var result = await _runner.ExplainAsync("--version", cancellationToken);
+            // ProbeAsync runs "gh --version" — a fast, non-interactive check that
+            // verifies the CLI executable is present and on PATH. This is intentionally
+            // separate from any Copilot subcommand so it doesn't trigger authentication
+            // prompts or consume API quota.
+            var result = await _runner.ProbeAsync(cancellationToken);
 
             var (level, title, description) = result.Succeeded
-                ? (StatusLevel.Healthy, "Copilot Agent reachable", $"CLI responded in {result.Duration.TotalMilliseconds:F0}ms.")
-                : (StatusLevel.Warning, "Copilot Agent unavailable",
+                ? (StatusLevel.Healthy,
+                   "Copilot Agent reachable",
+                   $"CLI responded in {result.Duration.TotalMilliseconds:F0}ms.")
+                : (StatusLevel.Warning,
+                   "Copilot Agent unavailable",
                    $"CLI exited with code {result.ExitCode}. {(result.ErrorOutput ?? result.Output).TrimEnd('.')}.");
 
             var signal = new StatusSignal(

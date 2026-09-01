@@ -35,7 +35,7 @@ public sealed class TriggerCopilotExplainOperation : IOperation
             new OperationParameter(
                 Name: "subject",
                 DisplayName: "Command or error to explain",
-                Description: "The shell command, error output, or concept you want Copilot to explain.",
+                Description: $"The shell command, error output, or concept you want Copilot to explain. Maximum {OperationHelpers.MaxInputLength} characters.",
                 IsRequired: true,
                 Type: "string",
                 DefaultValue: null)
@@ -58,6 +58,10 @@ public sealed class TriggerCopilotExplainOperation : IOperation
         {
             errors.Add("The 'subject' parameter is required.");
         }
+        else if (subject.Length > OperationHelpers.MaxInputLength)
+        {
+            errors.Add($"The 'subject' parameter exceeds the maximum length of {OperationHelpers.MaxInputLength} characters.");
+        }
 
         return Task.FromResult<IReadOnlyList<string>>(errors);
     }
@@ -67,7 +71,17 @@ public sealed class TriggerCopilotExplainOperation : IOperation
         CancellationToken cancellationToken)
     {
         var startedAt = DateTimeOffset.UtcNow;
-        var subject = context.Request.Input["subject"]!;
+
+        if (!context.Request.Input.TryGetValue("subject", out var subject) || string.IsNullOrWhiteSpace(subject))
+        {
+            return new OperationExecutionResult(
+                Status: OperationExecutionStatus.Rejected,
+                Message: "The 'subject' parameter is missing.",
+                StartedAtUtc: startedAt,
+                CompletedAtUtc: DateTimeOffset.UtcNow,
+                ErrorCode: "missing_parameter",
+                Output: new Dictionary<string, string?>());
+        }
 
         var result = await _runner.ExplainAsync(subject, cancellationToken);
 
@@ -87,14 +101,11 @@ public sealed class TriggerCopilotExplainOperation : IOperation
         return new OperationExecutionResult(
             Status: result.Succeeded ? OperationExecutionStatus.Succeeded : OperationExecutionStatus.Failed,
             Message: result.Succeeded
-                ? $"Copilot explained: \"{TruncateForMessage(subject)}\"."
+                ? $"Copilot explained: \"{OperationHelpers.TruncateForMessage(subject)}\"."
                 : $"Copilot CLI failed (exit code {result.ExitCode}).",
             StartedAtUtc: startedAt,
             CompletedAtUtc: DateTimeOffset.UtcNow,
             ErrorCode: result.Succeeded ? null : "copilot_cli_error",
             Output: output);
     }
-
-    private static string TruncateForMessage(string value, int maxLength = 80) =>
-        value.Length <= maxLength ? value : value[..maxLength] + "…";
 }

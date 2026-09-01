@@ -41,22 +41,9 @@ may ask Docker to pull the required images.
 The PowerShell wrapper at `run/run.ps1` remains as a compatibility entry point and
 forwards to the AppHost; it no longer launches separate API/UI processes.
 
+## Configuration
+
 Configuration defaults live in the tracked `.env` (placeholders only). Put local values in `.env.local`, which is gitignored.
-
-## Deployment metadata
-
-`azure.yaml` keeps Azure Developer CLI compatibility for the AppHost. For new
-deployments, prefer the Aspire deployment workflow so the AppHost remains the
-single source of truth for the resource graph:
-
-```bash
-aspire publish
-aspire deploy
-```
-
-`azd up` may be used where an existing Azure Developer CLI workflow is required,
-but it must be reviewed as an explicit deployment promotion and supplied only with
-external environment values; no credentials or endpoints belong in this repository.
 
 ## Quality gates
 

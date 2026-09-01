@@ -1,7 +1,6 @@
 using Projects;
 
 var builder = DistributedApplication.CreateBuilder(args);
-builder.AddAzureContainerAppEnvironment("aca-env");
 
 var postgres = builder
     .AddPostgres("postgres")

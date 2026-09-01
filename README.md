@@ -20,13 +20,28 @@ A pluggable engineering workbench for operational visibility and one-click actio
 - `src/` - .NET solution and backend projects
 - `ui/` - React frontend
 - `docs/` - engineering rules and plugin guidance
-- `run/` - local startup scripts
+- `src/ControlPlane.AppHost/` - .NET Aspire local orchestration and dashboard entry point
+- `src/ControlPlane.ServiceDefaults/` - shared health, resilience, service discovery, and OpenTelemetry defaults
+- `run/` - compatibility startup wrapper
 - `.github/` - CI workflow and dependency update configuration
 
 ## Local run
 
-1. Install dependencies: `npm ci --prefix ui`.
-2. Run `run\run.ps1`.
+Aspire is the canonical local entry point. It starts the API, Vite UI, PostgreSQL,
+Azure Service Bus Emulator, and the Aspire dashboard as one distributed application:
+
+```bash
+dotnet run --project src/ControlPlane.AppHost
+```
+
+The AppHost requires Docker for PostgreSQL and the Azure Service Bus Emulator. The
+Dashboard URL is printed by Aspire when startup completes. For the first run, Aspire
+may ask Docker to pull the required images.
+
+The PowerShell wrapper at `run/run.ps1` remains as a compatibility entry point and
+forwards to the AppHost; it no longer launches separate API/UI processes.
+
+## Configuration
 
 Configuration defaults live in the tracked `.env` (placeholders only). Put local values in `.env.local`, which is gitignored.
 

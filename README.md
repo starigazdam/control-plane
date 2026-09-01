@@ -30,6 +30,12 @@ A pluggable engineering workbench for operational visibility and one-click actio
 
 Configuration defaults live in the tracked `.env` (placeholders only). Put local values in `.env.local`, which is gitignored.
 
+## Architecture decisions
+
+Significant, durable choices are recorded in [Architecture Decision Records](docs/adr/README.md).
+Read the relevant ADR before changing plugin contracts, operation behavior, or
+agent activation defaults.
+
 ## Quality gates
 
 CI runs on every pull request and on pushes to `develop`:

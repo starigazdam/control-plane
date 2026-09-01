@@ -2,6 +2,7 @@ using System.Reflection;
 using ControlPlane.Azure;
 using ControlPlane.Core.Interfaces;
 using ControlPlane.Core.Plugins;
+using ControlPlane.CopilotAgent;
 using ControlPlane.DevOps;
 using ControlPlane.Kafka;
 using ControlPlane.ServiceBus;
@@ -17,11 +18,14 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration,
         params Assembly[] assemblies)
     {
+        // ── Settings ─────────────────────────────────────────────────────────
         services.Configure<AzureSettings>(configuration.GetSection(AzureSettings.SectionName));
         services.Configure<ServiceBusSettings>(configuration.GetSection(ServiceBusSettings.SectionName));
         services.Configure<KafkaSettings>(configuration.GetSection(KafkaSettings.SectionName));
         services.Configure<DevOpsSettings>(configuration.GetSection(DevOpsSettings.SectionName));
+        services.Configure<CopilotAgentSettings>(configuration.GetSection(CopilotAgentSettings.SectionName));
 
+        // ── Plugin discovery ─────────────────────────────────────────────────
         var pluginTypes = assemblies
             .SelectMany(assembly => assembly.DefinedTypes)
             .Where(type =>
@@ -42,9 +46,18 @@ public static class ServiceCollectionExtensions
             }
 
             pluginNames.Add(plugin.Name);
+
+            // Allow plugins to register their own DI services (e.g. ICopilotAgentRunner)
+            // before status providers and operations are wired up.
+            if (plugin is IPluginServiceRegistration serviceRegistration)
+            {
+                serviceRegistration.RegisterServices(services);
+            }
+
             plugin.Register(registration);
         }
 
+        // ── Status providers and operations ───────────────────────────────────
         foreach (var providerType in registration.StatusProviderTypes)
         {
             services.AddTransient(typeof(IStatusProvider), providerType);

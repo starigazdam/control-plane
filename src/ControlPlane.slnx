@@ -5,4 +5,5 @@
   <Project Path="ControlPlane.Kafka\ControlPlane.Kafka.csproj" />
   <Project Path="ControlPlane.DevOps\ControlPlane.DevOps.csproj" />
   <Project Path="ControlPlane.ServiceBus\ControlPlane.ServiceBus.csproj" />
+  <Project Path="ControlPlane.CopilotAgent\ControlPlane.CopilotAgent.csproj" />
 </Solution>

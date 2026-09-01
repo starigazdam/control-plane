@@ -1,0 +1,52 @@
+# Copilot Agent Plugin — runnable .http examples
+#
+# Prerequisites:
+#   1. Control Plane API running locally (default: http://localhost:5149)
+#   2. CopilotAgent__Enabled=true set in .env.local
+#   3. gh CLI installed with the Copilot extension: gh extension install github/gh-copilot
+#   4. gh auth login completed so the extension is authenticated
+#
+# Secrets: never commit real project IDs or API tokens here.
+# Copy this file and override @HOST in your local .env.local or IDE HTTP client settings.
+
+@HOST = http://localhost:5149
+@PROJECT_ID = placeholder
+
+###
+# Ask Copilot to suggest a shell command for a backend task.
+# RequiresConfirmation=true — the UI shows the suggested command for review before commit.
+# The returned "suggestedCommand" in the output is for human review only; it is never executed automatically.
+
+POST {{HOST}}/api/operations/execute
+Content-Type: application/json
+
+{
+  "projectId": "{{PROJECT_ID}}",
+  "operationId": "trigger-copilot-suggest",
+  "requestedBy": "engineer@example.com",
+  "input": {
+    "prompt": "List all running .NET processes on Linux and show their memory usage"
+  }
+}
+
+###
+# Ask Copilot to explain a shell command or error message.
+# RequiresConfirmation=false — read-only and non-destructive.
+
+POST {{HOST}}/api/operations/execute
+Content-Type: application/json
+
+{
+  "projectId": "{{PROJECT_ID}}",
+  "operationId": "trigger-copilot-explain",
+  "requestedBy": "engineer@example.com",
+  "input": {
+    "subject": "dotnet: /usr/share/dotnet/dotnet: cannot execute binary file: Exec format error"
+  }
+}
+
+###
+# Retrieve the last 20 operation executions (includes Copilot Agent history).
+
+GET {{HOST}}/api/operations/history?take=20
+Accept: application/json

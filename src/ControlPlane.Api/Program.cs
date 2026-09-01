@@ -2,6 +2,7 @@ using ControlPlane.Api.Infrastructure;
 using ControlPlane.Api.Persistence;
 using ControlPlane.Api.Services;
 using ControlPlane.Azure;
+using ControlPlane.CopilotAgent;
 using ControlPlane.DevOps;
 using ControlPlane.Kafka;
 using ControlPlane.ServiceBus;
@@ -33,7 +34,8 @@ builder.Services.AddControlPlanePlugins(
     typeof(AzurePlugin).Assembly,
     typeof(KafkaPlugin).Assembly,
     typeof(DevOpsPlugin).Assembly,
-    typeof(ServiceBusPlugin).Assembly);
+    typeof(ServiceBusPlugin).Assembly,
+    typeof(CopilotAgentPlugin).Assembly);
 builder.Services.AddDbContext<ControlPlaneDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("ControlPlane")

@@ -8,8 +8,10 @@ using ControlPlane.Kafka;
 using ControlPlane.ServiceBus;
 using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
 
 // Load .env (committed defaults), then .env.local (local overrides, gitignored)
 var root = builder.Environment.ContentRootPath;
@@ -39,8 +41,13 @@ builder.Services.AddControlPlanePlugins(
 builder.Services.AddDbContext<ControlPlaneDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("ControlPlane")
+        ?? builder.Configuration.GetConnectionString("controlplane")
         ?? "Data Source=control-plane.db";
-    options.UseSqlite(connectionString);
+
+    if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase))
+        options.UseNpgsql(connectionString);
+    else
+        options.UseSqlite(connectionString);
 });
 builder.Services.AddScoped<ControlPlaneWorkbenchService>();
 
@@ -64,5 +71,6 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapDefaultEndpoints();
 
 app.Run();

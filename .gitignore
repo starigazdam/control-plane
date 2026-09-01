@@ -26,6 +26,9 @@ dist-ssr/
 *.sqlite
 *.sqlite3
 
+# Aspire local state
+.aspire/
+
 # OS
 .DS_Store
 Thumbs.db

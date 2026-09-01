@@ -17,6 +17,7 @@ var api = builder
     .WithReference(controlPlaneDb)
     .WithReference(serviceBus)
     .WithReference(controlPlaneQueue)
+    .WithEnvironment("Database__Provider", "Postgres")
     .WaitFor(controlPlaneDb)
     .WaitFor(serviceBus);
 

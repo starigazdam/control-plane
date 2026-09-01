@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace ControlPlane.AppHost.Tests.Tests;
+namespace ControlPlane.AppHost.Tests;
 
 public sealed class ControlPlaneAppHostTests
 {
@@ -21,7 +21,12 @@ public sealed class ControlPlaneAppHostTests
             .WaitForResourceHealthyAsync("api", cancellationToken)
             .WaitAsync(StartupTimeout, cancellationToken);
 
-        using var httpClient = app.CreateHttpClient("api");
+        var endpoint = app.GetEndpoint("api", "https");
+        using var handler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
+        using var httpClient = new HttpClient(handler) { BaseAddress = endpoint };
         using var response = await httpClient.GetAsync("/health", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

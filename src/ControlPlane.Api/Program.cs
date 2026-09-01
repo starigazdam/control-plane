@@ -44,10 +44,13 @@ builder.Services.AddDbContext<ControlPlaneDbContext>(options =>
         ?? builder.Configuration.GetConnectionString("controlplane")
         ?? "Data Source=control-plane.db";
 
-    if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase))
+    var provider = builder.Configuration["Database:Provider"] ?? "Sqlite";
+    if (provider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
         options.UseNpgsql(connectionString);
-    else
+    else if (provider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
         options.UseSqlite(connectionString);
+    else
+        throw new InvalidOperationException($"Unsupported database provider '{provider}'.");
 });
 builder.Services.AddScoped<ControlPlaneWorkbenchService>();
 

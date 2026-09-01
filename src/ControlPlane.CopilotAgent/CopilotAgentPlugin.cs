@@ -19,8 +19,9 @@ namespace ControlPlane.CopilotAgent;
 /// Configuration keys (see <see cref="CopilotAgentSettings"/> and <c>.env</c>):
 /// <list type="bullet">
 ///   <item><c>CopilotAgent__Enabled</c> — set to <c>true</c> to activate agent operations.</item>
-///   <item><c>CopilotAgent__CliPath</c> — path to the CLI executable (default: <c>gh copilot</c>).</item>
-///   <item><c>CopilotAgent__WorkingDirectory</c> — working directory for CLI invocations.</item>
+///   <item><c>CopilotAgent__CliExecutable</c> — path to the gh executable (default: <c>gh</c>).</item>
+///   <item><c>CopilotAgent__CliBaseArgs</c> — base args before operation args (default: <c>copilot</c>).</item>
+///   <item><c>CopilotAgent__WorkingDirectory</c> — working directory for CLI invocations; must exist if set.</item>
 ///   <item><c>CopilotAgent__TimeoutSeconds</c> — per-invocation timeout (default: 120).</item>
 /// </list>
 /// </summary>

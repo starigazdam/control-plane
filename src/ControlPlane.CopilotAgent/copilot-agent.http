@@ -6,6 +6,10 @@
 #   3. gh CLI installed with the Copilot extension: gh extension install github/gh-copilot
 #   4. gh auth login completed so the extension is authenticated
 #
+# Settings split in this version:
+#   CopilotAgent__CliExecutable=gh       (path to the gh binary)
+#   CopilotAgent__CliBaseArgs=copilot    (selects the Copilot extension)
+#
 # Secrets: never commit real project IDs or API tokens here.
 # Copy this file and override @HOST in your local .env.local or IDE HTTP client settings.
 

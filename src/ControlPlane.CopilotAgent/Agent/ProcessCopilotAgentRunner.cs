@@ -5,14 +5,8 @@ using Microsoft.Extensions.Options;
 namespace ControlPlane.CopilotAgent.Agent;
 
 /// <summary>
-/// Shells out to <c>gh copilot</c> (or a configured path) to fulfil agent requests.
+/// Shells out to the configured <c>gh</c> executable to fulfil Copilot Agent requests.
 /// Each invocation is a separate process and is bounded by <see cref="CopilotAgentSettings.TimeoutSeconds"/>.
-///
-/// <para><strong>CliPath note:</strong> the configured <see cref="CopilotAgentSettings.CliPath"/>
-/// is split on the first space only to separate the executable from the base arguments
-/// (e.g. <c>"gh copilot"</c> → executable=<c>"gh"</c>, base-arg=<c>"copilot"</c>).
-/// Paths containing spaces must be quoted or the executable separated from its
-/// arguments using the <c>CopilotAgent__CliPath</c> convention.</para>
 /// </summary>
 public sealed class ProcessCopilotAgentRunner : ICopilotAgentRunner
 {
@@ -25,23 +19,21 @@ public sealed class ProcessCopilotAgentRunner : ICopilotAgentRunner
     {
         _settings = settings.Value;
         _logger = logger;
+
+        ValidateSettings(_settings);
     }
 
     /// <inheritdoc/>
     public Task<AgentInvocationResult> ProbeAsync(CancellationToken cancellationToken)
     {
-        // "gh --version" (no copilot subcommand) returns exit 0 and prints the gh version
-        // when the CLI is installed and on PATH. We cannot use "gh copilot --version"
-        // because the Copilot extension treats positional arguments as the text to explain.
-        var parts = _settings.CliPath.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-        var executable = parts[0];
-        return RunAsync(executable, ["--version"], cancellationToken);
+        // Run "gh --version" — a fast, non-interactive check that the gh executable
+        // is present and on PATH. Does NOT include the Copilot base args because we
+        // want to probe the executable itself, not the extension.
+        return RunAsync(_settings.CliExecutable, ["--version"], cancellationToken);
     }
 
     /// <inheritdoc/>
-    public Task<AgentInvocationResult> SuggestAsync(
-        string prompt,
-        CancellationToken cancellationToken)
+    public Task<AgentInvocationResult> SuggestAsync(string prompt, CancellationToken cancellationToken)
     {
         // gh copilot suggest accepts the prompt as a positional argument.
         // --target shell is the default mode that returns a runnable command.
@@ -49,26 +41,21 @@ public sealed class ProcessCopilotAgentRunner : ICopilotAgentRunner
     }
 
     /// <inheritdoc/>
-    public Task<AgentInvocationResult> ExplainAsync(
-        string subject,
-        CancellationToken cancellationToken)
+    public Task<AgentInvocationResult> ExplainAsync(string subject, CancellationToken cancellationToken)
     {
         return RunCliAsync(["explain", subject], cancellationToken);
     }
 
-    /// <summary>Runs the configured CLI with <paramref name="subcommandArgs"/> appended.</summary>
+    /// <summary>Prepends <see cref="CopilotAgentSettings.CliBaseArgs"/> and runs the CLI.</summary>
     private Task<AgentInvocationResult> RunCliAsync(
         IReadOnlyList<string> subcommandArgs,
         CancellationToken cancellationToken)
     {
-        // Split "gh copilot" → executable="gh", base-args=["copilot"]
-        var parts = _settings.CliPath.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var executable = parts[0];
-        var allArgs = parts.Length > 1
-            ? parts[1..].Concat(subcommandArgs).ToArray()
-            : subcommandArgs.ToArray();
+        var baseArgs = _settings.CliBaseArgs
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        return RunAsync(executable, allArgs, cancellationToken);
+        var allArgs = baseArgs.Concat(subcommandArgs).ToArray();
+        return RunAsync(_settings.CliExecutable, allArgs, cancellationToken);
     }
 
     private async Task<AgentInvocationResult> RunAsync(
@@ -130,7 +117,6 @@ public sealed class ProcessCopilotAgentRunner : ICopilotAgentRunner
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            // Timed out — kill the process if still running
             try { process?.Kill(entireProcessTree: true); } catch { /* best-effort */ }
             stopwatch.Stop();
 
@@ -149,6 +135,24 @@ public sealed class ProcessCopilotAgentRunner : ICopilotAgentRunner
         finally
         {
             process?.Dispose();
+        }
+    }
+
+    private static void ValidateSettings(CopilotAgentSettings settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.CliExecutable))
+        {
+            throw new InvalidOperationException(
+                "CopilotAgent__CliExecutable must not be empty. " +
+                "Set it to 'gh' or an absolute path to the gh executable.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(settings.WorkingDirectory) &&
+            !Directory.Exists(settings.WorkingDirectory))
+        {
+            throw new InvalidOperationException(
+                $"CopilotAgent__WorkingDirectory '{settings.WorkingDirectory}' does not exist. " +
+                "Create the directory or clear the setting to use the API process's working directory.");
         }
     }
 }

@@ -11,11 +11,10 @@
 ## Local development
 
 - Backend build: `dotnet build src/ControlPlane.slnx`
-- Backend run: `dotnet run --project src/ControlPlane.Api/ControlPlane.Api.csproj`
-- UI dependencies: `npm ci --prefix ui`
-- UI dev server: `npm run dev --prefix ui`
-- UI checks: `npm run lint --prefix ui` and `npm run build --prefix ui`
-- Both dev servers on Windows: `run\run.ps1`
+- Aspire local run: `dotnet run --project src/ControlPlane.AppHost`
+- Aspire integration tests: `dotnet test tests/ControlPlane.AppHost.Tests/ControlPlane.AppHost.Tests.csproj`
+- UI checks: `npm ci --prefix ui`, `npm run lint --prefix ui`, and `npm run build --prefix ui`
+- PowerShell compatibility wrapper: `run\run.ps1`
 
 Put local configuration in `.env.local`; leave the tracked `.env` as placeholders. Because `.env` is tracked, `.gitignore` cannot protect it — confirm the repository has **secret scanning with push protection** enabled (see [SECURITY.md](SECURITY.md)) so a real value pushed into `.env` is blocked.
 
@@ -27,7 +26,7 @@ Put local configuration in `.env.local`; leave the tracked `.env` as placeholder
 | --- | --- |
 | .NET restore | `dotnet restore src/ControlPlane.slnx` |
 | .NET build | `dotnet build src/ControlPlane.slnx --configuration Release` |
-| .NET test | `dotnet test` on each `.csproj` that references `Microsoft.NET.Test.Sdk` — the repository has none yet, so the real **Test** step shows as *skipped* while a separate **Skip test** step passes and emits an explanatory notice |
+| .NET test | `dotnet test tests/ControlPlane.AppHost.Tests/ControlPlane.AppHost.Tests.csproj` — boots the AppHost and verifies the API health endpoint through Aspire resources |
 | UI install | `npm ci` in `ui/` |
 | UI lint | `npm run lint` in `ui/` (oxlint) |
 | UI build | `npm run build` in `ui/` (`tsc -b && vite build`) |

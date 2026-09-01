@@ -1,0 +1,133 @@
+# Remote Docker development on `lxc-sandbox`
+
+## Supported topology
+
+Aspire and its Distributed Application Control Plane (DCP) run **on the Docker
+host**, using the sandbox's native Docker Unix socket. Hermes and `lxc-aibox`
+are remote developer clients that synchronize the checkout and invoke the
+AppHost over SSH. Neither client needs Docker, and neither should point Aspire
+at a forwarded `DOCKER_HOST=tcp://...` endpoint.
+
+This is intentional: Docker API reachability through a TCP bridge does not
+prove that Aspire DCP accepts the endpoint as a healthy runtime. Running DCP
+beside the native socket avoids that failure mode and keeps all containers,
+volumes, networks, and build caches on the disposable sandbox.
+
+The sandbox is development-only. Do not place production data, credentials,
+private registry logins, or persistent production services there.
+
+## One-time sandbox preparation
+
+After the reviewed change is merged, and with explicit approval to modify the
+sandbox, install/verify the pinned project prerequisites on `lxc-sandbox`:
+
+```bash
+# Run on the sandbox, from a checkout of this repository.
+dotnet --version       # must satisfy global.json (10.0.x)
+docker version
+docker compose version
+node --version         # Node.js 22 is used by CI
+npm --version
+npm ci --prefix ui
+```
+
+Do not set `DOCKER_HOST` on the sandbox. If it is present in the environment,
+remove it from the shell/session used to start Aspire. Verify the daemon with:
+
+```bash
+./run/sandbox-preflight.sh
+```
+
+The preflight is deliberately read-only. It checks Docker, .NET, Node, npm, UI
+dependencies, and rejects TCP/HTTP Docker endpoints before DCP starts.
+
+## Remote run from Hermes or aibox
+
+Configure an SSH alias in the developer's `~/.ssh/config` (the alias and path
+are intentionally not committed):
+
+```text
+Host control-plane-sandbox
+    HostName <sandbox-management-address>
+    User <development-user>
+```
+
+Then run from any checkout on Hermes or aibox:
+
+```bash
+SANDBOX_SSH_TARGET=control-plane-sandbox \
+SANDBOX_REPO_DIR=/home/<development-user>/src/control-plane \
+./run/sandbox-run.sh
+```
+
+The runner:
+
+1. Archives the current checkout over SSH, excluding `.git`, build output,
+   `.aspire`, UI dependencies, and UI build output.
+2. Updates only the configured development checkout directory on the sandbox.
+3. Runs the preflight remotely against the native Docker socket.
+4. Starts `dotnet run --project src/ControlPlane.AppHost/ControlPlane.AppHost.csproj`
+   remotely, so DCP and Docker are colocated.
+
+The sandbox's `.aspire` state, Docker named volumes, pulled images, and Docker
+build cache are not transferred or deleted. Source-only iterations therefore
+reuse dependency and container state. The sync does not run `git clean`, Docker
+prune, volume removal, or any other destructive cleanup.
+
+The AppHost's dashboard and web endpoint are printed by the remote process.
+Use an SSH local-port forward for temporary access; do not expose the sandbox
+service publicly. Because Aspire allocates development ports dynamically, a
+follow-up LAN deployment command should use an explicitly chosen, reviewed
+port mapping rather than assuming a dashboard port.
+
+## Integration test execution
+
+Distributed AppHost tests must also run on a machine with native Docker access.
+Run them on the sandbox (or in CI's native Docker runner), not from Hermes/aibox
+through a TCP Docker bridge:
+
+```bash
+ssh control-plane-sandbox \
+  'cd /home/<development-user>/src/control-plane && ./run/sandbox-preflight.sh && dotnet test tests/ControlPlane.AppHost.Tests/ControlPlane.AppHost.Tests.csproj --configuration Release'
+```
+
+CI remains the merge gate. The remote sandbox is an inner-loop development and
+reproduction environment, not a replacement for CI.
+
+## State, reset, rollback, and cleanup
+
+- PostgreSQL uses the Aspire data volume and is persistent across normal AppHost
+  restarts. Treat its contents as disposable development state.
+- The Service Bus Emulator is recreated/reused by Aspire as dictated by its
+  resource lifetime; no production messages belong there.
+- Normal source synchronization and AppHost shutdown do not delete volumes,
+  images, networks, or build cache.
+- Resetting the database, removing volumes/networks, or broad Docker cleanup
+  requires explicit confirmation and an inventory first:
+
+  ```bash
+  docker ps -a
+  docker volume ls
+  docker network ls
+  docker images
+  docker system df
+  ```
+
+- Rollback is source rollback: stop the AppHost, restore the prior reviewed
+  checkout/commit, and restart. Do not roll back by deleting persistent state.
+- A later LAN deployment workflow must add explicit health checks, port
+  ownership, a versioned image/tag, and a reversible previous-version path.
+  It is intentionally not hidden inside `sandbox-run.sh`.
+
+## Timing measurements
+
+Measure cold and warm iterations on the sandbox without recording secrets or
+raw logs:
+
+```bash
+/usr/bin/time -f 'elapsed=%E' ./run/sandbox-run.sh
+# After a source-only change, repeat the same command and record only elapsed time.
+```
+
+Record timings in the issue/PR as environment metadata. Do not claim expected
+latency until the commands have been run on the current sandbox state.

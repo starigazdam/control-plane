@@ -15,6 +15,9 @@
 - Aspire integration tests: `dotnet test tests/ControlPlane.AppHost.Tests/ControlPlane.AppHost.Tests.csproj`
 - UI checks: `npm ci --prefix ui`, `npm run lint --prefix ui`, and `npm run build --prefix ui`
 - PowerShell compatibility wrapper: `run\run.ps1`
+- Remote Docker sandbox workflow: [`docs/development-docker-sandbox.md`](docs/development-docker-sandbox.md)
+  with `run/sandbox-preflight.sh` and `run/sandbox-run.sh`. Aspire/DCP must run
+  beside the sandbox's native Docker socket; do not use a forwarded TCP Docker endpoint.
 
 Put local configuration in `.env.local`; leave the tracked `.env` as placeholders. Because `.env` is tracked, `.gitignore` cannot protect it — confirm the repository has **secret scanning with push protection** enabled (see [SECURITY.md](SECURITY.md)) so a real value pushed into `.env` is blocked.
 

@@ -14,7 +14,9 @@ using Microsoft.Extensions.Hosting;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
-// Load .env (committed defaults), then .env.local (local overrides, gitignored)
+// Load .env (committed defaults), then .env.local (local overrides, gitignored).
+// clobberExistingVars must be true for both loads so .env.local can actually
+// override a value already defined in .env (e.g. Project__Name).
 var root = builder.Environment.ContentRootPath;
 foreach (var name in new[] { ".env", ".env.local" })
 {
@@ -22,7 +24,7 @@ foreach (var name in new[] { ".env", ".env.local" })
     if (!File.Exists(path))
         path = Path.Combine(root, "..", name);
     if (File.Exists(path))
-        Env.Load(path, new LoadOptions(setEnvVars: true));
+        Env.Load(path, new LoadOptions(setEnvVars: true, clobberExistingVars: true));
 }
 
 builder.Configuration.AddEnvironmentVariables();

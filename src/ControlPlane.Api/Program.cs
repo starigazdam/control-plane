@@ -14,17 +14,21 @@ using Microsoft.Extensions.Hosting;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
-// Load .env (committed defaults), then .env.local (local overrides, gitignored).
-// clobberExistingVars must be true for both loads so .env.local can actually
-// override a value already defined in .env (e.g. Project__Name).
+// Load .env (committed defaults) without overwriting variables the process
+// already has (e.g. injected by Aspire via WithEnvironment, or set directly
+// in the shell/deployment environment) - .env values are lowest priority.
+// Then load .env.local (local developer overrides, gitignored) WITH
+// clobbering, since its whole purpose is to let a developer override a
+// value already defined in .env (e.g. Project__Name).
 var root = builder.Environment.ContentRootPath;
-foreach (var name in new[] { ".env", ".env.local" })
+var envFiles = new (string Name, bool Clobber)[] { (".env", false), (".env.local", true) };
+foreach (var (name, clobber) in envFiles)
 {
     var path = Path.Combine(root, name);
     if (!File.Exists(path))
         path = Path.Combine(root, "..", name);
     if (File.Exists(path))
-        Env.Load(path, new LoadOptions(setEnvVars: true, clobberExistingVars: true));
+        Env.Load(path, new LoadOptions(setEnvVars: true, clobberExistingVars: clobber));
 }
 
 builder.Configuration.AddEnvironmentVariables();

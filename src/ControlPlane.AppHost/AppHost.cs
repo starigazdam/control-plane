@@ -1,3 +1,4 @@
+using Aspire.Hosting.Yarp.Transforms;
 using Projects;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -30,7 +31,12 @@ builder
     .WithExternalHttpEndpoints()
     .WithConfiguration(config =>
     {
+        config.AddRoute("/api/health", api)
+            .WithTransformPathRemovePrefix("/api");
+        config.AddRoute("/api/alive", api)
+            .WithTransformPathRemovePrefix("/api");
         config.AddRoute("/api/{**catch-all}", api);
+        config.AddRoute(ui);
     })
     .PublishWithStaticFiles(ui);
 

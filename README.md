@@ -41,6 +41,10 @@ may ask Docker to pull the required images.
 The PowerShell wrapper at `run/run.ps1` remains as a compatibility entry point and
 forwards to the AppHost; it no longer launches separate API/UI processes.
 
+For Docker development when the daemon is on `lxc-sandbox`, use the remote runner
+and native-socket preflight described in [`docs/development-docker-sandbox.md`](docs/development-docker-sandbox.md).
+The AppHost and DCP run on the sandbox; Hermes and `lxc-aibox` connect over SSH.
+
 ## Configuration
 
 Configuration defaults live in the tracked `.env` (placeholders only). Put local values in `.env.local`, which is gitignored.

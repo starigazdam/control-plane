@@ -69,9 +69,11 @@ SANDBOX_REPO_DIR=/home/<development-user>/src/control-plane \
 The runner:
 
 1. Requires the configured remote directory to contain `.sandbox-checkout`.
-2. Archives **tracked files only** over SSH, so `.env.local`, certificates, and
-   other untracked local material never leave the client. The tracked `.env`
-   placeholder is transferred; never put a real value in that tracked file.
+2. Archives **tracked files only** over SSH, so the client's `.env.local`, certificates,
+   and other untracked local material never leave the client. A pre-existing
+   sandbox-side `.env.local` is preserved in place across replacement; it must
+   contain development-only values and is never copied from Hermes or aibox.
+   The tracked `.env` placeholder is transferred; never put a real value in that tracked file.
 3. Extracts into a staging directory, preserves only `.aspire` state and
    `ui/node_modules`, then replaces the checkout. Deleted or renamed tracked
    files therefore cannot remain stale on the sandbox.
@@ -85,9 +87,10 @@ if a client is known to be gone, inspect the sandbox before removing a stale
 lock directory.
 
 The sandbox's `.aspire` state, Docker named volumes, pulled images, and Docker
-build cache are not transferred or deleted. Source-only iterations therefore
-reuse dependency and container state. The sync does not run Docker prune,
-volume removal, or broad filesystem cleanup.
+build cache are not transferred or deleted. Source-only iterations reuse those
+Docker/npm assets, but the controlled source replacement discards `bin/` and
+`obj/`, so the .NET side performs a clean incremental-state rebuild each time.
+The sync does not run Docker prune, volume removal, or broad filesystem cleanup.
 
 Only one AppHost session should run against the shared sandbox at a time. Check
 `docker ps` before starting a second client. If an SSH connection drops, reconnect
@@ -104,11 +107,13 @@ port mapping rather than assuming a dashboard port.
 
 Distributed AppHost tests must also run on a machine with native Docker access.
 Run them on the sandbox (or in CI's native Docker runner), not from Hermes/aibox
-through a TCP Docker bridge:
+through a TCP Docker bridge. Stop any AppHost session first and take the same
+checkout lock before running a manual test, so the runner cannot replace the
+checkout underneath it:
 
 ```bash
 ssh control-plane-sandbox \
-  'cd /home/<development-user>/src/control-plane && ./run/sandbox-preflight.sh && dotnet test tests/ControlPlane.AppHost.Tests/ControlPlane.AppHost.Tests.csproj --configuration Release'
+  'set -e; lock=/home/<development-user>/src/control-plane.lock; test ! -e "$lock" || { echo "sandbox checkout is busy" >&2; exit 4; }; mkdir "$lock"; trap "rmdir \"$lock\"" EXIT; cd /home/<development-user>/src/control-plane && ./run/sandbox-preflight.sh && dotnet test tests/ControlPlane.AppHost.Tests/ControlPlane.AppHost.Tests.csproj --configuration Release'
 ```
 
 CI remains the merge gate. The remote sandbox is an inner-loop development and
@@ -137,6 +142,10 @@ fails closed until the dependency installation matches the lockfile.
   docker system df
   ```
 
+- If a connection drops during replacement, inspect for
+  `${SANDBOX_REPO_DIR}.previous` before reinitializing anything. If it contains
+  `.sandbox-checkout` and the main directory is absent, restore it with a
+  reviewed, non-destructive move; do not delete it or run broad cleanup.
 - Rollback is client-side source rollback: select the prior reviewed commit on
   Hermes/aibox and rerun `sandbox-run.sh`. The controlled replacement removes
   tracked files introduced by the newer source version; it does not delete
@@ -152,8 +161,10 @@ mode still performs the safety checks and controlled replacement but does not
 leave an interactive server running:
 
 ```bash
-/usr/bin/time -f 'sync_elapsed=%E' \
-  SANDBOX_SYNC_ONLY=1 ./run/sandbox-run.sh
+SANDBOX_SSH_TARGET=control-plane-sandbox \
+SANDBOX_REPO_DIR=/home/<development-user>/src/control-plane \
+SANDBOX_SYNC_ONLY=1 /usr/bin/time -f 'sync_elapsed=%E' \
+  ./run/sandbox-run.sh
 # After a source-only change, repeat the same command and compare the timings.
 ```
 

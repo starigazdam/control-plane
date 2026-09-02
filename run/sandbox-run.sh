@@ -10,7 +10,7 @@ REMOTE_DIR="${SANDBOX_REPO_DIR:-}"
 [[ "$TARGET" != -* ]] || { printf 'SANDBOX_SSH_TARGET must not begin with -\n' >&2; exit 2; }
 [[ -n "$REMOTE_DIR" && "$REMOTE_DIR" == /* ]] || { printf 'SANDBOX_REPO_DIR must be an absolute path on lxc-sandbox\n' >&2; exit 2; }
 REMOTE_DIR="${REMOTE_DIR%/}"
-[[ -n "$REMOTE_DIR" && "$REMOTE_DIR" != *..* ]] || { printf 'SANDBOX_REPO_DIR must not contain parent-directory components\n' >&2; exit 2; }
+[[ "$REMOTE_DIR" != / && "$REMOTE_DIR" != *..* ]] || { printf 'SANDBOX_REPO_DIR must not be root or contain parent-directory components\n' >&2; exit 2; }
 
 quote() {
   printf "'%s'" "${1//\'/\'\"\'\"\'}"
@@ -56,6 +56,9 @@ ssh "$TARGET" "set -e
   if [ -d $remote_dir_q/ui/node_modules ]; then
     mkdir -p -- $stage_q/ui
     cp -a -- $remote_dir_q/ui/node_modules $stage_q/ui/node_modules
+  fi
+  if [ -f $remote_dir_q/.env.local ]; then
+    cp -- $remote_dir_q/.env.local $stage_q/.env.local
   fi
   if [ -e $previous_q ]; then
     test -f $previous_q/.sandbox-checkout || { echo 'unsafe previous checkout; refusing replacement' >&2; exit 5; }

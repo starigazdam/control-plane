@@ -29,6 +29,9 @@ dist-ssr/
 # Aspire local state
 .aspire/
 
+# Sandbox checkout marker (created only on the remote development host)
+.sandbox-checkout
+
 # OS
 .DS_Store
 Thumbs.db

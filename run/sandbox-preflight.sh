@@ -17,6 +17,7 @@ command -v node >/dev/null 2>&1 || fail "node is not installed (required by the 
 command -v npm >/dev/null 2>&1 || fail "npm is not installed (required by the Vite resource)"
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
 [[ -d "$repo_root/ui/node_modules" ]] || fail "ui/node_modules is missing; run npm ci --prefix ui once on the sandbox"
 lock_hash="$(sha256sum "$repo_root/ui/package-lock.json" | cut -d' ' -f1)"
 recorded_hash="$(cut -d' ' -f1 "$repo_root/ui/node_modules/.sandbox-package-lock.sha256" 2>/dev/null || true)"

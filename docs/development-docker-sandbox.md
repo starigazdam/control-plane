@@ -30,6 +30,7 @@ node --version         # Node.js 22 is used by CI
 npm --version
 npm ci --prefix ui
 sha256sum ui/package-lock.json > ui/node_modules/.sandbox-package-lock.sha256
+export PATH="$HOME/.dotnet:$PATH"
 touch .sandbox-checkout
 ```
 
@@ -62,6 +63,7 @@ Then run from any checkout on Hermes or aibox:
 
 ```bash
 SANDBOX_SSH_TARGET=control-plane-sandbox \
+SANDBOX_SSH_IDENTITY_FILE=~/.ssh/hermes_lxc_ed25519 \
 SANDBOX_REPO_DIR=/home/<development-user>/src/control-plane \
 ./run/sandbox-run.sh
 ```
@@ -162,6 +164,7 @@ leave an interactive server running:
 
 ```bash
 SANDBOX_SSH_TARGET=control-plane-sandbox \
+SANDBOX_SSH_IDENTITY_FILE=~/.ssh/hermes_lxc_ed25519 \
 SANDBOX_REPO_DIR=/home/<development-user>/src/control-plane \
 SANDBOX_SYNC_ONLY=1 /usr/bin/time -f 'sync_elapsed=%E' \
   ./run/sandbox-run.sh

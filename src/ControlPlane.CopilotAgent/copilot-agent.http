@@ -11,10 +11,11 @@
 #   CopilotAgent__CliBaseArgs=copilot    (selects the Copilot extension)
 #
 # Secrets: never commit real project IDs or API tokens here.
-# Copy this file and override @HOST in your local .env.local or IDE HTTP client settings.
+# HOST/PROJECT_ID come from .env by default via {{$dotenv ...}}; override them in
+# your local .env.local (gitignored) instead of editing this file.
 
-@HOST = http://localhost:5149
-@PROJECT_ID = placeholder
+@HOST = {{$dotenv HOST}}
+@PROJECT_ID = {{$dotenv PROJECT_ID}}
 
 ###
 # Ask Copilot to suggest a shell command for a backend task.

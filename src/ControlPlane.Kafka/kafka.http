@@ -6,10 +6,11 @@
 #      set in .env.local (never commit real broker hosts — see SECURITY.md)
 #
 # Secrets: never commit real broker addresses or credentials here.
-# Copy this file and override @HOST in your local .env.local or IDE HTTP client settings.
+# HOST/PROJECT_ID come from .env by default via {{$dotenv ...}}; override them in
+# your local .env.local (gitignored) instead of editing this file.
 
-@HOST = http://localhost:5149
-@PROJECT_ID = placeholder
+@HOST = {{$dotenv HOST}}
+@PROJECT_ID = {{$dotenv PROJECT_ID}}
 
 ###
 # Replay a Kafka dead-letter topic to the primary processing topic.

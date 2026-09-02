@@ -14,17 +14,20 @@ a one-off for a single implementation, and is enforced in CI by
 2. **Runnable outside Control Plane** — plain REST Client / `.http` syntax
    (VS Code REST Client, JetBrains HTTP Client, etc.), no dependency on this
    repo's tooling beyond the running API.
-3. **Secrets loaded from `.env`** — the file must document which `.env`
-   keys the plugin needs and instruct contributors to put real values in
-   `.env.local` (gitignored). Never put a real secret, hostname, tenant ID,
-   or connection string in the committed `.http` file — only placeholders
-   containing `example`.
-4. **Reference a `{{HOST}}` variable** pointing at the local API
-   (`http://localhost:5149` by default) so contributors can override it per
-   environment without editing every request.
-5. Cover the plugin's operations with at least one request per operation,
-   plus a request to check `/api/operations/history` so the result is
-   observable.
+3. **Secrets loaded from `.env`** — variables such as `@HOST` and
+   `@PROJECT_ID` must be bound with the REST Client dotenv syntax
+   (`{{$dotenv HOST}}`, `{{$dotenv PROJECT_ID}}`) so the example actually
+   reads from the repo's `.env` (committed placeholders) and can be
+   overridden per developer in `.env.local` (gitignored) without editing the
+   `.http` file. Never put a real secret, hostname, tenant ID, or connection
+   string in the committed `.http` file or `.env` — only placeholders
+   containing `example`, or blank values meant to be filled in locally.
+4. **Reference the `{{$dotenv HOST}}` variable** pointing at the local API
+   (`http://localhost:5149` by default, defined in `.env`) so contributors
+   can override it per environment without editing every request.
+5. Cover the plugin's operations with at least one request per operation
+   (matched by the operation's `Id` in its `OperationDefinition`), plus a
+   request to check `/api/operations/history` so the result is observable.
 
 ## Template
 
@@ -41,6 +44,9 @@ directory (i.e. an actual plugin, not `ControlPlane.Core` or
 
 - the plugin has no `.http` file,
 - the plugin has more than one `.http` file (keep one canonical example),
-- the `.http` file doesn't reference `{{HOST}}` or `.env`, or
+- the `.http` file doesn't reference `{{$dotenv HOST}}` or `.env`,
+- the `.http` file doesn't include a request to `/api/operations/history`,
+- the `.http` file is missing a request for one of the plugin's operation
+  IDs (parsed from `Id: "..."` in each `Operations/*.cs` file), or
 - the `.http` file contains a token-like string that isn't an
   `example`-prefixed placeholder (a lightweight secret-scanning heuristic).

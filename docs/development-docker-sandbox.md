@@ -29,9 +29,15 @@ docker compose version
 node --version         # Node.js 22 is used by CI
 npm --version
 npm ci --prefix ui
+sha256sum ui/package-lock.json > ui/node_modules/.sandbox-package-lock.sha256
+touch .sandbox-checkout
 ```
 
-Do not set `DOCKER_HOST` on the sandbox. If it is present in the environment,
+`SANDBOX_REPO_DIR` must already exist and contain `.sandbox-checkout`; this
+marker is a deliberate guard against a path typo overwriting another directory.
+The runner maintains that directory as a synchronized, non-git checkout.
+Run the one-time preparation commands inside the directory that will be used
+for `SANDBOX_REPO_DIR`. Do not set `DOCKER_HOST` on the sandbox. If it is present in the environment,
 remove it from the shell/session used to start Aspire. Verify the daemon with:
 
 ```bash
@@ -62,17 +68,25 @@ SANDBOX_REPO_DIR=/home/<development-user>/src/control-plane \
 
 The runner:
 
-1. Archives the current checkout over SSH, excluding `.git`, build output,
-   `.aspire`, UI dependencies, and UI build output.
-2. Updates only the configured development checkout directory on the sandbox.
-3. Runs the preflight remotely against the native Docker socket.
-4. Starts `dotnet run --project src/ControlPlane.AppHost/ControlPlane.AppHost.csproj`
+1. Requires the configured remote directory to contain `.sandbox-checkout`.
+2. Archives **tracked files only** over SSH, so `.env.local`, certificates, and
+   other untracked local material never leave the client.
+3. Extracts into a staging directory, preserves only `.aspire` state and
+   `ui/node_modules`, then replaces the checkout. Deleted or renamed tracked
+   files therefore cannot remain stale on the sandbox.
+4. Runs the preflight remotely against the native Docker socket.
+5. Starts `dotnet run --project src/ControlPlane.AppHost/ControlPlane.AppHost.csproj`
    remotely, so DCP and Docker are colocated.
 
 The sandbox's `.aspire` state, Docker named volumes, pulled images, and Docker
 build cache are not transferred or deleted. Source-only iterations therefore
-reuse dependency and container state. The sync does not run `git clean`, Docker
-prune, volume removal, or any other destructive cleanup.
+reuse dependency and container state. The sync does not run Docker prune,
+volume removal, or broad filesystem cleanup.
+
+Only one AppHost session should run against the shared sandbox at a time. Check
+`docker ps` before starting a second client. If an SSH connection drops, reconnect
+or inspect the AppHost containers and stop only the orphaned development process
+after confirming its resource names; do not use broad Docker cleanup.
 
 The AppHost's dashboard and web endpoint are printed by the remote process.
 Use an SSH local-port forward for temporary access; do not expose the sandbox
@@ -113,8 +127,10 @@ reproduction environment, not a replacement for CI.
   docker system df
   ```
 
-- Rollback is source rollback: stop the AppHost, restore the prior reviewed
-  checkout/commit, and restart. Do not roll back by deleting persistent state.
+- Rollback is client-side source rollback: select the prior reviewed commit on
+  Hermes/aibox and rerun `sandbox-run.sh`. The controlled replacement removes
+  tracked files introduced by the newer source version; it does not delete
+  persistent Docker state.
 - A later LAN deployment workflow must add explicit health checks, port
   ownership, a versioned image/tag, and a reversible previous-version path.
   It is intentionally not hidden inside `sandbox-run.sh`.

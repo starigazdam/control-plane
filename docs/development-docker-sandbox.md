@@ -70,13 +70,19 @@ The runner:
 
 1. Requires the configured remote directory to contain `.sandbox-checkout`.
 2. Archives **tracked files only** over SSH, so `.env.local`, certificates, and
-   other untracked local material never leave the client.
+   other untracked local material never leave the client. The tracked `.env`
+   placeholder is transferred; never put a real value in that tracked file.
 3. Extracts into a staging directory, preserves only `.aspire` state and
    `ui/node_modules`, then replaces the checkout. Deleted or renamed tracked
    files therefore cannot remain stale on the sandbox.
 4. Runs the preflight remotely against the native Docker socket.
 5. Starts `dotnet run --project src/ControlPlane.AppHost/ControlPlane.AppHost.csproj`
    remotely, so DCP and Docker are colocated.
+
+The runner holds `${SANDBOX_REPO_DIR}.lock` for the complete sync and AppHost
+session. A second Hermes/aibox client is refused until the first session exits;
+if a client is known to be gone, inspect the sandbox before removing a stale
+lock directory.
 
 The sandbox's `.aspire` state, Docker named volumes, pulled images, and Docker
 build cache are not transferred or deleted. Source-only iterations therefore
@@ -108,6 +114,10 @@ ssh control-plane-sandbox \
 CI remains the merge gate. The remote sandbox is an inner-loop development and
 reproduction environment, not a replacement for CI.
 
+Changing `ui/package-lock.json` requires repeating `npm ci --prefix ui` and the
+`sha256sum` recording command on the sandbox before the next run; preflight
+fails closed until the dependency installation matches the lockfile.
+
 ## State, reset, rollback, and cleanup
 
 - PostgreSQL uses the Aspire data volume and is persistent across normal AppHost
@@ -137,13 +147,17 @@ reproduction environment, not a replacement for CI.
 
 ## Timing measurements
 
-Measure cold and warm iterations on the sandbox without recording secrets or
-raw logs:
+Measure source synchronization separately from AppHost startup. The sync-only
+mode still performs the safety checks and controlled replacement but does not
+leave an interactive server running:
 
 ```bash
-/usr/bin/time -f 'elapsed=%E' ./run/sandbox-run.sh
-# After a source-only change, repeat the same command and record only elapsed time.
+/usr/bin/time -f 'sync_elapsed=%E' \
+  SANDBOX_SYNC_ONLY=1 ./run/sandbox-run.sh
+# After a source-only change, repeat the same command and compare the timings.
 ```
 
-Record timings in the issue/PR as environment metadata. Do not claim expected
-latency until the commands have been run on the current sandbox state.
+A full AppHost start can then be measured separately with a bounded operator
+observation or a future health-gated runner mode. Record timings in the
+issue/PR as environment metadata. Do not claim expected latency until the
+commands have been run on the current sandbox state.

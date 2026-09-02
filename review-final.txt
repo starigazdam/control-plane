@@ -1,0 +1,126 @@
+I’ll first read the required repository conventions and the complete `develop...HEAD` diff, then I’ll trace the affected UI behavior and run the exact requested validation commands.
+
+● Read plugin-philosophy.md
+  │ docs/plugin-philosophy.md
+  └ 18 lines read
+
+● Read engineering-rules.md
+  │ docs/engineering-rules.md
+  └ 9 lines read
+
+● Read CONTRIBUTING.md
+  └ 53 lines read
+
+● Inspect full PR diff against develop (shell)
+  │ git diff --stat develop...HEAD && git diff --no-ext-diff --unified=80 develop...HEAD
+  └ 17 lines…
+
+✗ Read 1788382562579-copilot-tool-output-928-b8f0d867-5fec-4918-8d6f-c08f0d0cbdc2.txt
+  │ /tmp/1788382562579-copilot-tool-output-928-b8f0d867-5fec-4918-8d6f-c08f0d0cbdc2.txt
+  └ Path does not exist
+
+✗ Read 1788382562579-copilot-tool-output-928-b8f0d867-5fec-4918-8d6f-c08f0d0cbdc2.txt
+  │ /tmp/1788382562579-copilot-tool-output-928-b8f0d867-5fec-4918-8d6f-c08f0d0cbdc2.txt
+  └ Path does not exist
+
+● Read App.test.tsx
+  │ ui/src/App.test.tsx
+  └ 50 lines read
+
+● Read ci.yml
+  │ .github/workflows/ci.yml
+  └ 100 lines read
+
+● Read package.json
+  │ ui/package.json
+  └ 32 lines read
+
+● Read App.tsx
+  │ ui/src/App.tsx
+  └ 443 lines read
+
+● Read vitest.config.ts
+  │ ui/vitest.config.ts
+  └ 11 lines read
+
+● Check worktree and PR commits (shell)
+  │ git status --short && git diff --name-status develop...HEAD && git log --oneline --decorate -5
+  └ 15 lines…
+
+/ Search (grep)
+  │ "projectName|ProjectName|/api/overview|OverviewResponse|placeholder" in *.{cs,tsx,ts,json}
+  └ 139 lines found
+
+● Inspect baseline UI implementation (shell)
+  │ git show develop:ui/src/App.tsx | sed -n '1,280p'
+  └ 281 lines…
+
+● Inspect focused PR changes (shell)
+  │ git diff --no-ext-diff --unified=20 develop...HEAD -- ui/package.json ui/src/setupTests.ts
+  │ ui/vitest.config.ts ui/src/App.test.tsx .github/workflows/ci.yml CONTRIBUTING.md
+  └ 209 lines…
+
+● Read issue acceptance criteria (shell)
+  │ gh issue view 2 --repo starigazdam/control-plane --comments
+  └ 1 line…
+
+The implementation is narrowly scoped to fetching `/api/overview` and rendering the first project’s `projectName`; I’m now checking the issue text and API shape, then I’ll validate the new test/tooling path exactly as requested.
+
+● Inspect backend overview contract and implementation (shell)
+  │ sed -n '1,220p' src/ControlPlane.Api/Contracts/OverviewResponse.cs && sed -n '1,180p'
+  │ src/ControlPlane.Api/Controllers/OverviewController.cs && sed -n '1,180p'
+  │ src/ControlPlane.Api/Services/ControlPlaneWorkbenchService.cs
+  └ 219 lines…
+
+● Retrieve issue requirements (shell)
+  │ gh issue view 2 --repo starigazdam/control-plane --json number,title,body,state,url
+  └ 2 lines…
+
+● Run requested UI install, lint, tests, and build (shell)
+  │ cd ui && npm ci && npm run lint && npm test && npm run build
+  └ 53 lines…
+
+● Capture review line numbers (shell)
+  │ nl -ba ui/src/App.tsx | sed -n '100,175p;380,420p' && nl -ba ui/src/App.test.tsx
+  └ 168 lines…
+
+● Check diff hygiene and final worktree state (shell)
+  │ git diff --check develop...HEAD && git diff --numstat develop...HEAD && git status --short
+  └ 10 lines…
+
+● Inspect dependency lockfile changes (shell)
+  │ git diff develop...HEAD -- ui/package-lock.json | sed -n '1,180p'
+  └ 181 lines…
+
+**Critical**
+
+None found.
+
+**Warnings**
+
+- `ui/src/App.test.tsx:26-49` covers only the successful overview/header path. It does not verify that the backend-provided name is visible on the Projects page, despite issue #2 explicitly requiring visibility in both the main workbench layout and project pages.
+- The new test is a component test rather than the repository-required end-to-end test for a vertical slice. It does not exercise the real backend response or the full observe loop. Add an Aspire/UI integration path, or document a temporary limitation and cover the project-page path at minimum.
+- The assertion that `"Placeholder Project"` is absent is effectively vacuous: the test never navigates to the Projects page or mocks its request, so that label could still be displayed there without failing this test.
+
+**Suggestions**
+
+- Replace the fixed `data-testid` assertion with user-visible semantic queries where practical, and add tests for empty/error overview responses.
+- Restore or reset the global `fetch` mock between tests (`vi.restoreAllMocks()` or `vi.unstubAllGlobals()`) as the suite grows.
+- Consider deriving the project ID from the overview response rather than retaining `/api/projects/placeholder`; this would avoid coupling the UI to the current backend seed project when multiple projects are introduced.
+
+**Looks Good**
+
+- The header now uses `projects[0].projectName` from `/api/overview` and retains a sensible loading fallback.
+- The Projects page already renders `projectDetails.project.name` from the backend, so no hardcoded project display label was introduced there.
+- React text rendering safely escapes backend-provided names.
+- Vitest, jsdom, Testing Library, setup configuration, CI execution, and contributor documentation are wired consistently.
+- `npm ci`, lint, tests, and production build complete successfully.
+
+**VERDICT: REQUEST_CHANGES**
+
+
+
+Changes    +0 -0
+AI Credits 1.45 (45s)
+Tokens     ↑ 147.1k (112.0k cached, 35.1k written) • ↓ 2.9k (1.3k reasoning)
+Resume     copilot --resume=37cf5792-478f-455e-aec5-df0f1804d624

@@ -1,3 +1,4 @@
+using System.Linq;
 using ControlPlane.Api.Configuration;
 using ControlPlane.Api.Infrastructure;
 using ControlPlane.Api.Persistence;
@@ -14,21 +15,31 @@ using Microsoft.Extensions.Hosting;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
-// Load .env (committed defaults) without overwriting variables the process
-// already has (e.g. injected by Aspire via WithEnvironment, or set directly
-// in the shell/deployment environment) - .env values are lowest priority.
-// Then load .env.local (local developer overrides, gitignored) WITH
-// clobbering, since its whole purpose is to let a developer override a
-// value already defined in .env (e.g. Project__Name).
+// Load .env (committed defaults) and .env.local (local developer overrides,
+// gitignored) as data only (setEnvVars: false), then apply values manually
+// so environment variables set BEFORE this process started (e.g. Aspire's
+// WithEnvironment, the shell, or deployment infrastructure) always win.
+// Precedence: external environment > .env.local > .env default.
+var externalKeys = new HashSet<string>(
+    Environment.GetEnvironmentVariables().Keys.Cast<string>(),
+    StringComparer.OrdinalIgnoreCase);
+
 var root = builder.Environment.ContentRootPath;
-var envFiles = new (string Name, bool Clobber)[] { (".env", false), (".env.local", true) };
-foreach (var (name, clobber) in envFiles)
+foreach (var name in new[] { ".env", ".env.local" })
 {
     var path = Path.Combine(root, name);
     if (!File.Exists(path))
         path = Path.Combine(root, "..", name);
-    if (File.Exists(path))
-        Env.Load(path, new LoadOptions(setEnvVars: true, clobberExistingVars: clobber));
+    if (!File.Exists(path))
+        continue;
+
+    foreach (var (key, value) in Env.Load(path, new LoadOptions(setEnvVars: false)))
+    {
+        if (externalKeys.Contains(key))
+            continue;
+
+        Environment.SetEnvironmentVariable(key, value);
+    }
 }
 
 builder.Configuration.AddEnvironmentVariables();

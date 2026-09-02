@@ -31,6 +31,7 @@ builder
     .WithConfiguration(config =>
     {
         config.AddRoute("/api/{**catch-all}", api);
+        config.AddRoute(ui);
     })
     .PublishWithStaticFiles(ui);
 

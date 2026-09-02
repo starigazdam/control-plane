@@ -1,3 +1,4 @@
+using ControlPlane.Api.Configuration;
 using ControlPlane.Api.Infrastructure;
 using ControlPlane.Api.Persistence;
 using ControlPlane.Api.Services;
@@ -25,6 +26,8 @@ foreach (var name in new[] { ".env", ".env.local" })
 }
 
 builder.Configuration.AddEnvironmentVariables();
+
+builder.Services.Configure<ProjectSettings>(builder.Configuration.GetSection(ProjectSettings.SectionName));
 
 // Add services to the container.
 builder.Services.AddControllers();

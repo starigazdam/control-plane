@@ -1,9 +1,11 @@
+using ControlPlane.Api.Configuration;
 using ControlPlane.Api.Contracts;
 using ControlPlane.Api.Persistence;
 using ControlPlane.Core.Concepts;
 using ControlPlane.Core.Interfaces;
 using ControlPlane.Core.Operations;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace ControlPlane.Api.Services;
@@ -16,15 +18,18 @@ public sealed class ControlPlaneWorkbenchService
     private readonly IReadOnlyList<IStatusProvider> _statusProviders;
     private readonly IReadOnlyDictionary<string, IOperation> _operationsById;
     private readonly ControlPlaneDbContext _dbContext;
+    private readonly IOptions<ProjectSettings> _projectSettings;
 
     public ControlPlaneWorkbenchService(
         IEnumerable<IStatusProvider> statusProviders,
         IEnumerable<IOperation> operations,
-        ControlPlaneDbContext dbContext)
+        ControlPlaneDbContext dbContext,
+        IOptions<ProjectSettings> projectSettings)
     {
         _statusProviders = statusProviders.ToArray();
         _operationsById = operations.ToDictionary(operation => operation.Definition.Id, StringComparer.OrdinalIgnoreCase);
         _dbContext = dbContext;
+        _projectSettings = projectSettings;
     }
 
     public async Task<OverviewResponse> GetOverviewAsync(CancellationToken cancellationToken)
@@ -165,18 +170,28 @@ public sealed class ControlPlaneWorkbenchService
 
     private async Task<Project> EnsurePlaceholderProjectAsync(CancellationToken cancellationToken)
     {
+        var configuredName = _projectSettings.Value.Name;
+        var projectName = string.IsNullOrWhiteSpace(configuredName)
+            ? ProjectSettings.DefaultName
+            : configuredName.Trim();
+
         var existing = await _dbContext.Projects
-            .AsNoTracking()
             .SingleOrDefaultAsync(project => project.Id == PlaceholderProjectId, cancellationToken);
         if (existing is not null)
         {
+            if (!string.Equals(existing.Name, projectName, StringComparison.Ordinal))
+            {
+                existing.Name = projectName;
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+
             return ToProject(existing);
         }
 
         var entity = new ProjectEntity
         {
             Id = PlaceholderProjectId,
-            Name = "Placeholder Project",
+            Name = projectName,
             TagsJson = JsonSerializer.Serialize(new[] { "control-plane", "draft" }, SerializerOptions),
             EnvironmentsJson = JsonSerializer.Serialize(new[] { "dev" }, SerializerOptions)
         };

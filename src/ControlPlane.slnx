@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="ControlPlane.Core\ControlPlane.Core.csproj" />
   <Project Path="../tests/ControlPlane.AppHost.Tests/ControlPlane.AppHost.Tests.csproj" />
+  <Project Path="../tests/ControlPlane.Api.Tests/ControlPlane.Api.Tests.csproj" />
   <Project Path="ControlPlane.Api\ControlPlane.Api.csproj" />
   <Project Path="ControlPlane.AppHost/ControlPlane.AppHost.csproj" />
   <Project Path="ControlPlane.Azure\ControlPlane.Azure.csproj" />

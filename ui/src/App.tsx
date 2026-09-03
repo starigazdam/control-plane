@@ -41,6 +41,19 @@ type OperationDefinition = {
   parameters: OperationParameter[]
 }
 
+type OverviewProjectSummary = {
+  projectId: string
+  projectName: string
+  statusLevel: string
+  activeAlerts: number
+  availableOperations: number
+}
+
+type OverviewResponse = {
+  generatedAtUtc: string
+  projects: OverviewProjectSummary[]
+}
+
 type ProjectDetailsResponse = {
   project: {
     id: string
@@ -94,6 +107,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000
 
 function App() {
   const [activePage, setActivePage] = useState<PageKey>('overview')
+  const [projectName, setProjectName] = useState<string | null>(null)
   const [projectDetails, setProjectDetails] = useState<ProjectDetailsResponse | null>(
     null,
   )
@@ -112,6 +126,10 @@ function App() {
   )
 
   useEffect(() => {
+    void loadOverview()
+  }, [])
+
+  useEffect(() => {
     if (activePage === 'projects') {
       void loadProject()
       void loadHistory()
@@ -121,6 +139,24 @@ function App() {
       void loadHistory()
     }
   }, [activePage])
+
+  const loadOverview = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/overview`)
+      if (!response.ok) {
+        throw new Error(`Failed to load overview (${response.status})`)
+      }
+
+      const payload = (await response.json()) as OverviewResponse
+      setProjectName(payload.projects[0]?.projectName ?? null)
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : 'Unknown overview loading error',
+      )
+    }
+  }
 
   const loadProject = async () => {
     setIsLoadingProject(true)
@@ -351,7 +387,7 @@ function App() {
     return (
       <section className="cards">
         <article className="card">
-          <h3>Placeholder Project</h3>
+          <h3>{projectName ?? 'Loading project…'}</h3>
           <p>Status: Healthy</p>
         </article>
         <article className="card">
@@ -371,7 +407,7 @@ function App() {
       <header className="top-bar">
         <div>
           <p className="eyebrow">Control Plane</p>
-          <h1>Engineering Workbench</h1>
+          <h1 data-testid="project-name">{projectName ?? 'Engineering Workbench'}</h1>
         </div>
         <p className="tagline">
           Operational visibility and one-click actions across projects.

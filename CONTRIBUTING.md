@@ -13,7 +13,7 @@
 - Backend build: `dotnet build src/ControlPlane.slnx`
 - Aspire local run: `dotnet run --project src/ControlPlane.AppHost`
 - Aspire integration tests: `dotnet test tests/ControlPlane.AppHost.Tests/ControlPlane.AppHost.Tests.csproj`
-- UI checks: `npm ci --prefix ui`, `npm run lint --prefix ui`, and `npm run build --prefix ui`
+- UI checks: `npm ci --prefix ui`, `npm run lint --prefix ui`, `npm test --prefix ui`, and `npm run build --prefix ui`
 - PowerShell compatibility wrapper: `run\run.ps1`
 - Remote Docker sandbox workflow: [`docs/development-docker-sandbox.md`](docs/development-docker-sandbox.md)
   with `run/sandbox-preflight.sh` and `run/sandbox-run.sh`. Aspire/DCP must run
@@ -32,6 +32,7 @@ Put local configuration in `.env.local`; leave the tracked `.env` as placeholder
 | .NET test | `dotnet test tests/ControlPlane.AppHost.Tests/ControlPlane.AppHost.Tests.csproj` — boots the AppHost and verifies the API health endpoint through Aspire resources |
 | UI install | `npm ci` in `ui/` |
 | UI lint | `npm run lint` in `ui/` (oxlint) |
+| UI test | `npm test` in `ui/` (vitest) |
 | UI build | `npm run build` in `ui/` (`tsc -b && vite build`) |
 
 Adding the first `Microsoft.NET.Test.Sdk` project turns the .NET test gate on automatically — no workflow change needed.

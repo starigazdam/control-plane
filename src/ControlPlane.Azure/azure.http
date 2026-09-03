@@ -1,0 +1,36 @@
+# Azure Plugin — runnable .http examples
+#
+# Prerequisites:
+#   1. Control Plane API running locally (default: http://localhost:5149)
+#   2. Azure__TenantId / Azure__SubscriptionId / Azure__ClientId / Azure__ClientSecret
+#      set in .env.local (never commit real values — see SECURITY.md)
+#
+# Secrets: never commit real tenant IDs, subscription IDs, or client secrets here.
+# HOST/PROJECT_ID come from .env by default via {{$dotenv ...}}; override them in
+# your local .env.local (gitignored) instead of editing this file.
+
+@HOST = {{$dotenv HOST}}
+@PROJECT_ID = {{$dotenv PROJECT_ID}}
+
+###
+# Restart an Azure App Service.
+# RequiresConfirmation=true — the UI asks for confirmation before executing.
+# This is currently a stub: see RestartAppServiceOperation.ExecuteAsync.
+
+POST {{HOST}}/api/operations/execute
+Content-Type: application/json
+
+{
+  "projectId": "{{PROJECT_ID}}",
+  "operationId": "restart-app-service",
+  "requestedBy": "engineer@example.com",
+  "input": {
+    "serviceName": "example-app-service"
+  }
+}
+
+###
+# Retrieve the last 20 operation executions (includes Azure plugin history).
+
+GET {{HOST}}/api/operations/history?take=20
+Accept: application/json

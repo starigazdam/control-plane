@@ -1,0 +1,36 @@
+# DevOps Plugin — runnable .http examples
+#
+# Prerequisites:
+#   1. Control Plane API running locally (default: http://localhost:5149)
+#   2. DevOps__OrgUrl / DevOps__PersonalAccessToken / DevOps__MonitoredProjects
+#      set in .env.local (never commit a real PAT or org URL — see SECURITY.md)
+#
+# Secrets: never commit a real personal access token or org URL here.
+# HOST/PROJECT_ID come from .env by default via {{$dotenv ...}}; override them in
+# your local .env.local (gitignored) instead of editing this file.
+
+@HOST = {{$dotenv HOST}}
+@PROJECT_ID = {{$dotenv PROJECT_ID}}
+
+###
+# Rerun a failed Azure DevOps pipeline.
+# RequiresConfirmation=true — the UI asks for confirmation before executing.
+# This is currently a stub: see RerunFailedPipelineOperation.ExecuteAsync.
+
+POST {{HOST}}/api/operations/execute
+Content-Type: application/json
+
+{
+  "projectId": "{{PROJECT_ID}}",
+  "operationId": "rerun-failed-pipeline",
+  "requestedBy": "engineer@example.com",
+  "input": {
+    "pipelineId": "1234"
+  }
+}
+
+###
+# Retrieve the last 20 operation executions (includes DevOps plugin history).
+
+GET {{HOST}}/api/operations/history?take=20
+Accept: application/json

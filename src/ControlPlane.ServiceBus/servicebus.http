@@ -1,0 +1,53 @@
+# Service Bus Plugin — runnable .http examples
+#
+# Prerequisites:
+#   1. Control Plane API running locally (default: http://localhost:5149)
+#   2. ServiceBus__ConnectionString / ServiceBus__MonitoredQueues
+#      set in .env.local (never commit a real connection string — see SECURITY.md)
+#
+# Secrets: never commit a real Service Bus connection string here.
+# HOST/PROJECT_ID come from .env by default via {{$dotenv ...}}; override them in
+# your local .env.local (gitignored) instead of editing this file.
+
+@HOST = {{$dotenv HOST}}
+@PROJECT_ID = {{$dotenv PROJECT_ID}}
+
+###
+# Replay dead-letter messages from a Service Bus entity.
+# RequiresConfirmation=true — the UI asks for confirmation before executing.
+# This is currently a stub: see ReplayServiceBusDlqOperation.ExecuteAsync.
+
+POST {{HOST}}/api/operations/execute
+Content-Type: application/json
+
+{
+  "projectId": "{{PROJECT_ID}}",
+  "operationId": "replay-servicebus-dlq",
+  "requestedBy": "engineer@example.com",
+  "input": {
+    "entityPath": "example-queue/subscriptions/example-subscription"
+  }
+}
+
+###
+# Purge pending messages from a Service Bus queue.
+# RequiresConfirmation=true — the UI asks for confirmation before executing.
+# This is currently a stub: see PurgeServiceBusQueueOperation.ExecuteAsync.
+
+POST {{HOST}}/api/operations/execute
+Content-Type: application/json
+
+{
+  "projectId": "{{PROJECT_ID}}",
+  "operationId": "purge-servicebus-queue",
+  "requestedBy": "engineer@example.com",
+  "input": {
+    "queueName": "example-queue"
+  }
+}
+
+###
+# Retrieve the last 20 operation executions (includes Service Bus plugin history).
+
+GET {{HOST}}/api/operations/history?take=20
+Accept: application/json

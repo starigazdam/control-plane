@@ -1,0 +1,36 @@
+# Kafka Plugin — runnable .http examples
+#
+# Prerequisites:
+#   1. Control Plane API running locally (default: http://localhost:5149)
+#   2. Kafka__BootstrapServers / Kafka__MonitoredConsumerGroups / Kafka__DlqTopics
+#      set in .env.local (never commit real broker hosts — see SECURITY.md)
+#
+# Secrets: never commit real broker addresses or credentials here.
+# HOST/PROJECT_ID come from .env by default via {{$dotenv ...}}; override them in
+# your local .env.local (gitignored) instead of editing this file.
+
+@HOST = {{$dotenv HOST}}
+@PROJECT_ID = {{$dotenv PROJECT_ID}}
+
+###
+# Replay a Kafka dead-letter topic to the primary processing topic.
+# RequiresConfirmation=true — the UI asks for confirmation before executing.
+# This is currently a stub: see ReplayKafkaDlqOperation.ExecuteAsync.
+
+POST {{HOST}}/api/operations/execute
+Content-Type: application/json
+
+{
+  "projectId": "{{PROJECT_ID}}",
+  "operationId": "replay-kafka-dlq",
+  "requestedBy": "engineer@example.com",
+  "input": {
+    "topic": "example-topic.dlq"
+  }
+}
+
+###
+# Retrieve the last 20 operation executions (includes Kafka plugin history).
+
+GET {{HOST}}/api/operations/history?take=20
+Accept: application/json

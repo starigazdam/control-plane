@@ -11,6 +11,8 @@ Control Plane uses an explicit plugin model focused on engineering actions, not 
 1. Implement `IControlPlanePlugin` in a plugin project (`ControlPlane.Azure`, `ControlPlane.Kafka`, etc.).
 2. Register each `IStatusProvider` and `IOperation` from that plugin via `IPluginRegistration`.
 3. Add UI affordances as named actions (for example, `ReplayBillingDlq`) rather than filter-driven workflows.
+4. Add a runnable `.http` example for the plugin — see
+   [Plugin `.http` examples](plugin-http-examples.md). This is enforced by CI.
 
 ## Non-goals
 1. No generic Kafka management UI.

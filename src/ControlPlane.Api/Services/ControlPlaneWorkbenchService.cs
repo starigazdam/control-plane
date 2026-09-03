@@ -134,7 +134,10 @@ public sealed class ControlPlaneWorkbenchService
         var limitedTake = Math.Clamp(take, 1, 200);
         var entries = await _dbContext.OperationExecutions
             .AsNoTracking()
-            .OrderByDescending(execution => execution.RequestedAtUtc)
+            // Ordered by Id (not RequestedAtUtc) because SQLite/EF Core cannot translate
+            // ORDER BY on a DateTimeOffset column; Id is a monotonically increasing
+            // surrogate key, so this preserves the same most-recent-first ordering.
+            .OrderByDescending(execution => execution.Id)
             .Take(limitedTake)
             .ToListAsync(cancellationToken);
 

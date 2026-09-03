@@ -30,6 +30,24 @@ Content-Type: application/json
 }
 
 ###
+# Resend dead-letter messages from a Service Bus DLQ back to the target queue.
+# RequiresConfirmation=true — the UI asks for confirmation before executing.
+# This is currently a stub (see the Resend...Operation's ExecuteAsync).
+
+POST {{HOST}}/api/operations/execute
+Content-Type: application/json
+
+{
+  "projectId": "{{PROJECT_ID}}",
+  "operationId": "resend-servicebus-dlq-to-queue",
+  "requestedBy": "engineer@example.com",
+  "input": {
+    "sourceDlqPath": "example-queue/$DeadLetterQueue",
+    "queueName": "example-queue"
+  }
+}
+
+###
 # Purge pending messages from a Service Bus queue.
 # RequiresConfirmation=true — the UI asks for confirmation before executing.
 # This is currently a stub: see PurgeServiceBusQueueOperation.ExecuteAsync.

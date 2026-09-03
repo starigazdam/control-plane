@@ -130,7 +130,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (activePage === 'projects') {
+    if (activePage === 'projects' || activePage === 'operations') {
       void loadProject()
       void loadHistory()
     }
@@ -376,7 +376,7 @@ function App() {
   }
 
   const renderPageContent = () => {
-    if (activePage === 'projects') {
+    if (activePage === 'projects' || activePage === 'operations') {
       return renderProjectsPage()
     }
 

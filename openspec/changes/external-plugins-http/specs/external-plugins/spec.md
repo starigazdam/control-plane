@@ -15,12 +15,17 @@ The host SHALL consume an external plugin as an out-of-process HTTP and JSON
 service. The consumer SHALL deploy and operate each external plugin process. The
 host SHALL NOT spawn, supervise, or restart an external plugin process. The host
 SHALL read a static configuration list of entries, each with a `name` and a
-`baseUrl`. The host SHALL load the external plugin set at startup only, and a
-restart SHALL apply a configuration change.
+`baseUrl`. `baseUrl` SHALL be an absolute `http` or `https` URI. The host SHALL
+load the external plugin set at startup only, and a restart SHALL apply a
+configuration change.
 
 #### Scenario: Host consumes a deployed external plugin
 - **WHEN** the host starts with a configured external plugin entry
 - **THEN** the host calls that plugin over HTTP at its `baseUrl` and does not start a plugin process
+
+#### Scenario: Configured baseUrl is missing or invalid
+- **WHEN** a configured plugin entry has a missing `baseUrl`, or a `baseUrl` that is not an absolute `http` or `https` URI
+- **THEN** the host fails startup with a clear error that names the `baseUrl` setting
 
 #### Scenario: External plugin process stops after startup
 - **WHEN** an external plugin process stops after the host has started
@@ -47,15 +52,34 @@ provider ids and the remote operation definitions.
 
 ### Requirement: Validate the capabilities response shape
 
-The response SHALL be JSON whose top-level shape is an object with a
-`statusProviderIds` array and an `operations` array. A response that is not JSON
-or whose top-level shape omits either array SHALL be invalid capabilities. An
-operation entry that omits a required field or supplies a wrongly typed required
-field SHALL be excluded and reported as a `Warning` signal on `{name}.bridge`.
+The response SHALL be a JSON object with a `statusProviderIds` array and an
+`operations` array. A response that is not JSON or that omits either array SHALL
+be invalid capabilities. An operation entry SHALL require a string `id` and a
+string `displayName`; `description` SHALL default to empty,
+`requiresConfirmation` to `false`, and `parameters` to empty. An operation entry
+with a missing or wrongly typed required field SHALL be excluded with a `Warning`
+signal on `{name}.bridge`.
 
 #### Scenario: Operation entry is missing a required field
 - **WHEN** a capabilities response contains an operation entry with a missing or wrongly typed required field
 - **THEN** the host excludes that entry, reports a `Warning` signal on `{name}.bridge`, and registers the remaining capabilities
+
+### Requirement: Validate capability sub-entries
+
+A parameter entry SHALL require a string `name` and a string `type`;
+`displayName` SHALL default to `name`, `description` to empty, `isRequired` to
+`false`, and `defaultValue` to null. An operation with an invalid parameter entry
+SHALL be excluded with a `Warning` signal on `{name}.bridge`. A non-string
+`statusProviderIds` element SHALL be excluded with a `Warning` signal on
+`{name}.bridge`.
+
+#### Scenario: Operation entry has an invalid parameter entry
+- **WHEN** a capabilities response contains an operation whose parameter entry omits a required field or supplies a wrongly typed required field
+- **THEN** the host excludes that operation, reports a `Warning` signal on `{name}.bridge`, and registers the remaining capabilities
+
+#### Scenario: Status provider id element is not a string
+- **WHEN** a capabilities response contains a non-string element in `statusProviderIds`
+- **THEN** the host excludes that element, reports a `Warning` signal on `{name}.bridge`, and registers the remaining capabilities
 
 ### Requirement: Namespace external capabilities by plugin name
 
@@ -81,9 +105,10 @@ match the grammar.
 ### Requirement: Exclude remote ids that are not valid
 
 A remote id SHALL be 1-64 ASCII letters, digits, dots, underscores, or hyphens.
-The status provider id `bridge` SHALL be reserved. The host SHALL exclude a
-status provider whose remote id is `bridge`, and a capability whose remote id
-does not match the grammar. The host SHALL report each exclusion as a `Warning`
+The first character of a remote id SHALL be an ASCII letter or digit. The status
+provider id `bridge` SHALL be reserved. The host SHALL exclude a status provider
+whose remote id is `bridge`, and a capability whose remote id does not match the
+grammar. The host SHALL report each exclusion as a `Warning`
 signal on `{name}.bridge`.
 
 #### Scenario: Capabilities contain an invalid remote id
@@ -97,15 +122,16 @@ signal on `{name}.bridge`.
 ### Requirement: Exclude duplicate remote ids
 
 The host SHALL exclude every entry in a duplicate group when two status provider
-ids, or two operation ids, are equal. The comparison SHALL be case-sensitive.
-The host SHALL report each exclusion as a `Warning` signal on `{name}.bridge`.
+ids, or two operation ids, are equal. The comparison SHALL be ordinal
+case-insensitive, matching the workbench operation lookup. The host SHALL report
+each exclusion as a `Warning` signal on `{name}.bridge`.
 
 #### Scenario: Status provider ids duplicate
-- **WHEN** a capabilities response lists two status provider ids that are equal
+- **WHEN** a capabilities response lists two status provider ids that are equal under ordinal case-insensitive comparison
 - **THEN** the host excludes every entry in that duplicate group and reports a `Warning` signal on `{name}.bridge`
 
 #### Scenario: Operation ids duplicate
-- **WHEN** a capabilities response lists two operation ids that are equal
+- **WHEN** a capabilities response lists two operation ids that are equal under ordinal case-insensitive comparison
 - **THEN** the host excludes every entry in that duplicate group and reports a `Warning` signal on `{name}.bridge`
 
 ### Requirement: Normalize external capabilities to Core contracts
@@ -139,13 +165,31 @@ the change design.
 - **WHEN** a caller invokes a remote operation
 - **THEN** the bridge calls `POST /operations/{id}/validate` and `POST /operations/{id}/execute` with the defined payloads
 
+### Requirement: Resolve external endpoints from baseUrl
+
+The bridge SHALL resolve each endpoint by appending its path to `baseUrl` with
+exactly one `/` separator, preserving any path in `baseUrl`. In each path the
+bridge SHALL use the remote id captured at discovery, not the requested operation
+id, and SHALL percent-encode it as one path segment. The bridge SHALL
+percent-encode `projectId`.
+
+#### Scenario: baseUrl carries a path
+- **WHEN** a configured `baseUrl` contains a path
+- **THEN** the bridge preserves that path and appends the endpoint path with exactly one `/` separator
+
+#### Scenario: Remote id is used on the wire
+- **WHEN** a caller invokes an exposed external operation
+- **THEN** the bridge uses the remote id captured at discovery, percent-encoded as one path segment, in the wire path
+
 ### Requirement: Register a bridge status provider for every plugin
 
-The host SHALL register exactly one status provider `{name}.bridge` for every
+The host SHALL register one status provider `{name}.bridge` for every
 configured plugin. The provider SHALL report `Healthy` when discovery succeeded
 with no excluded capability. The provider SHALL report `Warning` when the plugin
-is unreachable, when the plugin returns a non-2xx response or invalid
-capabilities, or when one or more capabilities were excluded.
+is unreachable, returns a non-2xx response or invalid capabilities, or when one
+or more capabilities were excluded. The provider SHALL reflect startup discovery
+only and SHALL NOT change after startup. The fixed signal ids are `unreachable`
+and `invalid-capabilities`.
 
 #### Scenario: Plugin discovery succeeds without exclusions
 - **WHEN** a configured plugin is reachable and returns no excluded capability
@@ -153,15 +197,19 @@ capabilities, or when one or more capabilities were excluded.
 
 #### Scenario: Plugin is unreachable at startup
 - **WHEN** a configured plugin is unreachable at startup
-- **THEN** the host registers `{name}.bridge` reporting `Warning` with `unreachable` and starts
+- **THEN** the host registers `{name}.bridge` reporting `Warning` with the fixed signal id `unreachable` and starts
 
 #### Scenario: Plugin returns invalid capabilities at startup
 - **WHEN** a configured plugin returns a non-2xx response or invalid capabilities at startup
-- **THEN** the host registers `{name}.bridge` reporting `Warning` with `invalid capabilities` and starts
+- **THEN** the host registers `{name}.bridge` reporting `Warning` with the fixed signal id `invalid-capabilities` and starts
 
 #### Scenario: Plugin capabilities are excluded
 - **WHEN** one or more capabilities of a reachable plugin are excluded
 - **THEN** the host keeps the remaining capabilities and registers `{name}.bridge` reporting `Warning` that lists the excluded capabilities
+
+#### Scenario: Bridge provider reflects startup discovery only
+- **WHEN** a plugin that succeeded at discovery fails after startup
+- **THEN** the `{name}.bridge` provider keeps reporting its startup result and does not change
 
 ### Requirement: Keep the host available when discovery fails
 
@@ -181,53 +229,99 @@ plugin. The bridge SHALL NOT retry a failed call.
 - **WHEN** an external call does not complete within 10 seconds
 - **THEN** the bridge cancels the call and does not retry it
 
-### Requirement: Map remote failures to stable results
+### Requirement: Map a failed status call to a warning snapshot
 
-A remote execute call that times out, fails at the transport layer, returns a
-non-2xx response, or returns a malformed response SHALL produce an
-`OperationExecutionResult` with status `Failed` and a stable bridge code. A
-well-formed remote execute response SHALL pass its `status`, `message`,
-`errorCode`, and `output` through unchanged. The host SHALL record the result
-through the existing execution history path. A failed remote status call SHALL
-produce a `Warning` snapshot.
-
-#### Scenario: Remote execute call fails at the bridge
-- **WHEN** a remote execute call times out, fails at the transport layer, returns a non-2xx response, or returns a malformed response
-- **THEN** the bridge returns a `Failed` result with a stable bridge code and the host records it in execution history
-
-#### Scenario: Remote execute response is well formed
-- **WHEN** a remote execute response is well formed
-- **THEN** the bridge passes the remote `status`, `message`, `errorCode`, and `output` through unchanged
+A status call SHALL fail when it times out, fails at the transport layer, returns
+a non-2xx response, or returns a body that does not deserialize to a
+`StatusSnapshot` with known `StatusLevel` values. `GetStatusAsync` SHALL NOT
+throw for a failed call; it SHALL return a `Warning` snapshot. For every returned
+snapshot, the bridge SHALL set `providerId` to `{name}.{remoteId}` and
+`projectId` to the requested project id.
 
 #### Scenario: Remote status call fails
-- **WHEN** a remote status call fails
-- **THEN** the bridge returns a `Warning` snapshot
+- **WHEN** a remote status call times out, fails at the transport layer, returns a non-2xx response, or returns a body that does not deserialize to a `StatusSnapshot` with known `StatusLevel` values
+- **THEN** the bridge returns a `Warning` snapshot and does not throw
+
+#### Scenario: Returned snapshot identity
+- **WHEN** the bridge returns a status snapshot for a plugin named `sample` with remote id `ping`
+- **THEN** the snapshot carries `providerId` `sample.ping` and `projectId` set to the requested project id
+
+### Requirement: Map a failed execute call to a stable result
+
+A remote execute call that times out, fails at transport, returns a non-2xx
+response, or returns an invalid response SHALL produce an
+`OperationExecutionResult` with status `Failed` and a stable bridge code. The
+host SHALL record the result in execution history.
+
+#### Scenario: Remote execute call fails at the bridge
+- **WHEN** a remote execute call times out, fails at transport, returns a non-2xx response, or returns an invalid response
+- **THEN** the bridge returns a `Failed` result with a stable bridge code and the host records it in execution history
+
+### Requirement: Define a well-formed execute response
+
+A well-formed remote execute response SHALL carry a string `status` and a string
+`message`; `errorCode` and `output` are optional. The bridge SHALL pass the
+remote `status`, `message`, `errorCode`, and `output` through unchanged, and SHALL
+set `startedAtUtc` and `completedAtUtc` from its own call timing.
+
+#### Scenario: Remote execute response is well formed
+- **WHEN** a remote execute response carries a string `status` and a string `message`
+- **THEN** the bridge passes the remote `status`, `message`, `errorCode`, and `output` through unchanged and sets the timestamps from its own call timing
 
 ### Requirement: Use stable bridge error codes
 
-A bridge-side failure SHALL use one of the stable bridge codes
-`external_operation_timeout`, `external_operation_transport_failed`,
-`external_operation_unexpected_status`, or
-`external_operation_invalid_response`. A bridge code SHALL be produced only for
-a bridge-side failure. A remote `status` value outside `Succeeded`, `Failed`, or
-`Rejected` SHALL be a malformed response and SHALL map to
-`external_operation_invalid_response`.
+A bridge-side execute failure SHALL map to a stable bridge code: a timeout SHALL
+map to `external_operation_timeout`; a connection or protocol failure SHALL map
+to `external_operation_transport_failed`; and a non-2xx HTTP status SHALL map to
+`external_operation_unexpected_status`.
+
+#### Scenario: Remote execute call times out
+- **WHEN** a remote execute call exceeds the bridge timeout
+- **THEN** the bridge returns a `Failed` result with `external_operation_timeout`
+
+#### Scenario: Remote execute call fails at the transport layer
+- **WHEN** a remote execute call fails at the connection or protocol layer
+- **THEN** the bridge returns a `Failed` result with `external_operation_transport_failed`
+
+#### Scenario: Remote execute call returns a non-2xx status
+- **WHEN** a remote execute call returns a non-2xx HTTP status
+- **THEN** the bridge returns a `Failed` result with `external_operation_unexpected_status`
+
+### Requirement: Map an invalid execute response to the invalid-response code
+
+An unparseable body, a missing required field, a `status` value outside
+`Succeeded`, `Failed`, or `Rejected`, or a remote `errorCode` that begins with
+`external_operation_` SHALL map to `external_operation_invalid_response`.
 
 #### Scenario: Remote execute status is not recognized
 - **WHEN** a remote execute response carries a `status` value outside `Succeeded`, `Failed`, or `Rejected`
 - **THEN** the bridge returns a `Failed` result with `external_operation_invalid_response`
 
+#### Scenario: Remote errorCode uses a bridge prefix
+- **WHEN** a well-formed remote execute response carries an `errorCode` that begins with `external_operation_`
+- **THEN** the bridge returns a `Failed` result with `external_operation_invalid_response`
+
+### Requirement: Propagate caller cancellation
+
+Caller cancellation SHALL propagate `OperationCanceledException`. Only the
+bridge's own timeout SHALL map to `external_operation_timeout`.
+
+#### Scenario: Caller cancels an external call
+- **WHEN** the caller's cancellation token is cancelled during an external call
+- **THEN** the bridge propagates `OperationCanceledException` and does not map the cancellation to `external_operation_timeout`
+
 ### Requirement: Reject a remote operation when the validate call fails
 
 When a remote validate call times out, fails at the transport layer, returns a
 non-2xx response, or returns a malformed body, the bridge `ValidateAsync` SHALL
-return one error string that contains a stable bridge code. The workbench SHALL
-reject the execution with `operation_validation_failed` and SHALL NOT call the
-remote execute.
+return one error string that contains a stable bridge code. The error string
+SHALL use the format `"<code>: <detail>"`. The workbench SHALL reject the
+execution with `operation_validation_failed` and SHALL NOT call the remote
+execute.
 
 #### Scenario: Remote validate call fails
 - **WHEN** a remote validate call times out, fails at the transport layer, returns a non-2xx response, or returns a malformed body
-- **THEN** `ValidateAsync` returns one error string with a stable bridge code and the workbench rejects with `operation_validation_failed` without calling execute
+- **THEN** `ValidateAsync` returns one error string with the format `"<code>: <detail>"` and the workbench rejects with `operation_validation_failed` without calling execute
 
 ### Requirement: Preserve remote confirmation as metadata only
 
@@ -243,9 +337,10 @@ for an external call.
 ### Requirement: Do not forward caller identity
 
 The host SHALL NOT forward actor identity, a correlation id, or credentials to
-an external plugin. The host SHALL NOT authenticate an external call. An
-operator SHALL run an external plugin on a trusted network only until #57.
+an external plugin. The bridge SHALL disable trace-context propagation on its
+`HttpClient`. The host SHALL NOT authenticate an external call. An operator
+SHALL run an external plugin on a trusted network only until #57.
 
 #### Scenario: Host calls an external plugin
 - **WHEN** the host calls an external plugin
-- **THEN** the request carries no actor identity, correlation id, or credentials
+- **THEN** the request carries no actor identity, credentials, `traceparent`, `tracestate`, or other correlation header

@@ -1,5 +1,22 @@
 # Spec Delta
 
+## ADDED Requirements
+
+### Requirement: Require unique capability ids across registered plugins
+
+The host SHALL fail startup with a clear error when two registered operations, or
+two registered status providers, expose ids that are equal under ordinal
+case-insensitive comparison. The check SHALL cover built-in and external
+capabilities together.
+
+#### Scenario: Two registered operations share an id
+- **WHEN** two registered operations, built-in or external, expose ids that are equal under ordinal case-insensitive comparison
+- **THEN** the host fails startup with a clear duplicate-id error
+
+#### Scenario: Two registered status providers share an id
+- **WHEN** two registered status providers, built-in or external, expose ids that are equal under ordinal case-insensitive comparison
+- **THEN** the host fails startup with a clear duplicate-id error
+
 ## MODIFIED Requirements
 
 ### Requirement: Register plugin capabilities through IPluginRegistration
@@ -28,6 +45,23 @@ registration and each factory registration separately.
 - **WHEN** a plugin registers N status provider instances or factories
 - **THEN** the host collects N descriptors
 
+### Requirement: Allow optional plugin service registration before wiring
+
+A plugin that implements `IPluginServiceRegistration` SHALL have
+`RegisterServices(IServiceCollection services, IConfiguration configuration)`
+invoked during discovery, and the host SHALL pass the application
+`IConfiguration`. That call SHALL happen before `plugin.Register` is called and
+before the host wires status providers and operations. The host SHALL NOT keep a
+backward-compatible `RegisterServices(IServiceCollection)` overload.
+
+#### Scenario: Plugin opts into service registration
+- **WHEN** a plugin implements `IPluginServiceRegistration`
+- **THEN** the host invokes `RegisterServices` with the application `IConfiguration` before `Register` and before status providers and operations are wired
+
+#### Scenario: Plugin does not opt into service registration
+- **WHEN** a plugin does not implement `IPluginServiceRegistration`
+- **THEN** the host performs no plugin service registration for that plugin
+
 ### Requirement: Resolve status providers and operations into the container
 
 The host SHALL register each collected descriptor as its capability contract. A
@@ -36,8 +70,7 @@ type descriptor SHALL register as a transient `IStatusProvider` or a transient
 A factory descriptor SHALL register a singleton created by invoking its factory
 with the `IServiceProvider`, so a factory can resolve services such as
 `IHttpClientFactory`. The host SHALL also record a `DiscoveredPluginCatalog`
-that holds the recorded plugin names and the capability descriptors instead of
-type lists.
+that holds the recorded plugin names and the capability descriptors.
 
 #### Scenario: Collected types become container registrations
 - **WHEN** plugins have registered status providers and operations as types

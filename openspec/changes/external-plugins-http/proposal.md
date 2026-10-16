@@ -18,8 +18,10 @@ keeps the existing plugin model.
   the wire contract to `IStatusProvider` and `IOperation`. Adapters for custom
   consumer APIs stay in the consumer's process, never in this repository.
 - Read a static configuration list of plugin entries, each with a `name` and a
-  `baseUrl`. Load the plugin set at startup only. A restart applies changes. Do
-  not add hot reload.
+  `baseUrl`. Require `baseUrl` to be an absolute `http` or `https` URI; fail
+  startup with a clear error that names the setting when `baseUrl` is missing or
+  invalid. Load the plugin set at startup only. A restart applies changes. Do not
+  add hot reload.
 - Fetch `GET /capabilities` once per plugin during registration, synchronously,
   with a 10-second timeout. Expose the wire endpoints `GET /capabilities`,
   `GET /status/{id}?projectId={projectId}`, `POST /operations/{id}/validate`,
@@ -27,36 +29,55 @@ keeps the existing plugin model.
   container exists, so it uses one short-lived `HttpClient`; runtime remote
   calls use `IHttpClientFactory`.
 - Use the plugin `name` as a namespace. Expose operations and status providers
-  as `{name}.{remoteId}`. Fail startup on a duplicate or invalid name. Register
-  one status provider `{name}.bridge` for every configured plugin. Exclude a
-  remote id that violates the id grammar, the reserved status provider id
-  `bridge`, and every entry of a duplicate id group, and report each exclusion
-  as a `Warning` on `{name}.bridge`.
+  as `{name}.{remoteId}`. Fail startup on a duplicate or invalid name, and fail
+  startup when two registered operations, or two registered status providers,
+  built-in or external, expose ids equal under ordinal case-insensitive
+  comparison. Register one status provider `{name}.bridge` for every configured
+  plugin. Exclude a remote id that violates the id grammar, the reserved status
+  provider id `bridge`, every entry of a duplicate id group (ordinal
+  case-insensitive), a non-string `statusProviderIds` element, and an operation
+  entry that omits its required string `id` or `displayName` or carries an invalid
+  parameter entry, and report each exclusion as a `Warning` on `{name}.bridge`.
 - Keep the host available when a plugin is unreachable, returns a non-2xx
   response, or returns invalid capabilities at startup. The `{name}.bridge`
   provider reports `Healthy` when discovery succeeds with no exclusions, and
-  `Warning` with `unreachable`, `invalid capabilities`, or the excluded
-  capabilities otherwise. Register no operations for a failed plugin and still
-  start.
+  `Warning` with the signal ids `unreachable` or `invalid-capabilities`, or the
+  excluded capabilities otherwise. Register no operations for a failed plugin and
+  still start.
 - Bound every call at a fixed 10-second timeout with no retry. Map a failed
-  execute call to an `OperationExecutionResult` with `Failed` and a stable
-  bridge code, recorded through the existing execution history path. Pass a
-  well-formed remote execute result through unchanged. Return a stable bridge
-  code from `ValidateAsync` when a remote validate call fails, so the workbench
-  rejects with `operation_validation_failed` and does not execute. Map a failed
-  status call to a `Warning` snapshot.
+  execute call to an `OperationExecutionResult` with `Failed` and an explicit
+  stable bridge code: timeout to `external_operation_timeout`, transport error
+  to `external_operation_transport_failed`, non-2xx response to
+  `external_operation_unexpected_status`, and unparseable body, missing required
+  field, unknown `status`, or a remote `errorCode` beginning with
+  `external_operation_` to `external_operation_invalid_response`. Record the
+  result through the existing execution history path. Pass a well-formed remote
+  execute result's `status`, `message`, `errorCode`, and `output` through
+  unchanged, and set the timestamps from the bridge's own call timing. Return a
+  stable bridge code from `ValidateAsync` when a remote validate call fails, so
+  the workbench rejects with `operation_validation_failed` and does not execute.
+  Map a failed status call to a `Warning` snapshot without throwing, with
+  `providerId` `{name}.{remoteId}` and the requested `projectId`. Caller
+  cancellation propagates `OperationCanceledException`; only the bridge's own
+  timeout maps to `external_operation_timeout`.
 - Change `IPluginRegistration` to support instance and factory registration so
   one plugin can register many remote status providers and operations. Factory
   overloads take `Func<IServiceProvider, IStatusProvider>` and
   `Func<IServiceProvider, IOperation>` and register as singletons, so a bridge
   can resolve `IHttpClientFactory`. Change `DiscoveredPluginCatalog` from `Type`
-  lists to descriptors. The project is new, so there is no
-  backward-compatibility requirement; update built-in plugins as needed.
+  lists to descriptors. Change `IPluginServiceRegistration.RegisterServices` to
+  `RegisterServices(IServiceCollection services, IConfiguration configuration)`
+  with no backward-compatible overload, so the bridge binds its section during
+  registration, calls `services.AddHttpClient()`, and keeps its plugin list for
+  its `Register` call. The project is new, so there is no backward-compatibility
+  requirement; update built-in plugins as needed.
 - Map remote `requiresConfirmation` to `OperationDefinition.RequiresConfirmation`
   as metadata only, exactly like the built-ins.
 - Do not forward actor identity, a correlation id, or credentials in this
-  slice, and add no authentication. Document that operators must run external
-  plugins on a trusted network until #57.
+  slice, and add no authentication. Disable trace-context propagation on the
+  bridge `HttpClient`, so a request carries no `traceparent`, `tracestate`, or
+  other correlation header. Document that operators must run external plugins on
+  a trusted network until #57.
 - Publish the wire contract as OpenAPI in `docs/` at implementation time. Add a
   fabricated fixture plugin that runs as a separate Kestrel process in tests,
   `.http` examples for the bridge and the fixture, and a short authoring guide.
@@ -72,14 +93,15 @@ keeps the existing plugin model.
 ### Modified Capabilities
 
 - `plugin-registration`: The registration contract supports instance and factory
-  registration and records capability descriptors instead of only types, so one
-  plugin can expose many remote status providers and operations.
+  registration and records capability descriptors, so one plugin can expose many
+  remote status providers and operations.
 
 ## Impact
 
 - New project `ControlPlane.ExternalPlugins` with its settings and configuration
   binding. Proposed modifications to
   `src/ControlPlane.Core/Plugins/IPluginRegistration.cs`,
+  `src/ControlPlane.Core/Plugins/IPluginServiceRegistration.cs`,
   `src/ControlPlane.Api/Infrastructure/PluginRegistration.cs`,
   `src/ControlPlane.Api/Infrastructure/DiscoveredPluginCatalog.cs`,
   `src/ControlPlane.Api/Infrastructure/ServiceCollectionExtensions.cs`, and

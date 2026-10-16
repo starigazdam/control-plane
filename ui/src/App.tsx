@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
+import { extractCommitSha, resolveApiBaseUrl } from './buildIdentity'
 
 type PageKey =
   | 'overview'
@@ -103,7 +104,7 @@ const pages: PageDefinition[] = [
   },
 ]
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'
+const API_BASE_URL = resolveApiBaseUrl(import.meta.env)
 
 function App() {
   const [activePage, setActivePage] = useState<PageKey>('overview')
@@ -119,6 +120,7 @@ function App() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [buildCommitSha, setBuildCommitSha] = useState<string | null>(null)
 
   const currentPage = useMemo(
     () => pages.find((page) => page.key === activePage) ?? pages[0],
@@ -127,6 +129,10 @@ function App() {
 
   useEffect(() => {
     void loadOverview()
+  }, [])
+
+  useEffect(() => {
+    void loadBuildIdentity()
   }, [])
 
   useEffect(() => {
@@ -139,6 +145,23 @@ function App() {
       void loadHistory()
     }
   }, [activePage])
+
+  const loadBuildIdentity = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/version`)
+      if (!response.ok) {
+        setBuildCommitSha(null)
+        return
+      }
+
+      const payload: unknown = await response.json()
+      setBuildCommitSha(extractCommitSha(payload))
+    } catch {
+      // The badge is nonblocking metadata: any failure degrades to unknown and
+      // must not surface as a page error or block the overview and tabs.
+      setBuildCommitSha(null)
+    }
+  }
 
   const loadOverview = async () => {
     try {
@@ -409,9 +432,19 @@ function App() {
           <p className="eyebrow">Control Plane</p>
           <h1 data-testid="project-name">{projectName ?? 'Engineering Workbench'}</h1>
         </div>
-        <p className="tagline">
-          Operational visibility and one-click actions across projects.
-        </p>
+        <div className="top-bar-meta">
+          <span
+            className="build-badge"
+            data-testid="build-badge"
+            title={`Build ${buildCommitSha ?? 'unknown'}`}
+            aria-label={`Build ${buildCommitSha ?? 'unknown'}`}
+          >
+            Build {buildCommitSha ? buildCommitSha.slice(0, 7) : 'unknown'}
+          </span>
+          <p className="tagline">
+            Operational visibility and one-click actions across projects.
+          </p>
+        </div>
       </header>
 
       <nav className="nav-tabs" aria-label="Primary">

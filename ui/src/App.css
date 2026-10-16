@@ -25,6 +25,23 @@
   letter-spacing: 0.08em;
 }
 
+.top-bar-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.build-badge {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .tagline {
   margin: 0;
   max-width: 24rem;
@@ -175,6 +192,10 @@ td {
 @media (max-width: 740px) {
   .top-bar {
     flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .top-bar-meta {
     align-items: flex-start;
   }
 }

@@ -1,0 +1,17 @@
+services:
+  control-plane:
+    image: ${CONTROL_PLANE_IMAGE:?set CONTROL_PLANE_IMAGE to an explicit image reference}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ContainerHosting__Enabled: "true"
+      Database__Provider: Sqlite
+      ConnectionStrings__ControlPlane: "Data Source=/data/control-plane.db"
+      CopilotAgent__Enabled: "false"
+    ports:
+      - "${CONTROL_PLANE_BIND_ADDRESS:-127.0.0.1}:${CONTROL_PLANE_PORT:-8080}:8080"
+    volumes:
+      - control-plane-data:/data
+
+volumes:
+  control-plane-data:

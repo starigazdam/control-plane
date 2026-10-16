@@ -11,6 +11,7 @@ test('overview, badge, Projects and Execution History render from same-origin re
   request,
 }) => {
   const apiRequests: string[] = []
+  const apiResponses: Array<{ url: string; status: number }> = []
   const pageErrors: string[] = []
 
   page.on('request', (outgoing) => {
@@ -18,12 +19,29 @@ test('overview, badge, Projects and Execution History render from same-origin re
       apiRequests.push(outgoing.url())
     }
   })
+  page.on('response', (response) => {
+    if (response.url().includes('/api/')) {
+      apiResponses.push({ url: response.url(), status: response.status() })
+    }
+  })
   page.on('pageerror', (error) => pageErrors.push(error.message))
 
   await page.goto('/')
   const baseOrigin = new URL(page.url()).origin
 
-  await expect(page.getByTestId('project-name')).toHaveText(/\S/)
+  const overviewResponse = await request.get('/api/overview')
+  expect(overviewResponse.ok()).toBeTruthy()
+  const overview = (await overviewResponse.json()) as {
+    projects: Array<{ projectId: string; projectName: string }>
+  }
+  const projectId = overview.projects[0]?.projectId
+  const projectName = overview.projects[0]?.projectName
+  expect(projectId).toBeTruthy()
+  expect(projectName).toBeTruthy()
+
+  // The header must render the project name the API actually returned. A
+  // fallback label or a failed load would not match.
+  await expect(page.getByTestId('project-name')).toHaveText(projectName ?? '')
   await expect(page.getByTestId('build-badge')).toContainText(/Build ([0-9a-f]{7}|unknown)/)
 
   const expectedSha = process.env.PLAYWRIGHT_BUILD_SHA
@@ -32,15 +50,11 @@ test('overview, badge, Projects and Execution History render from same-origin re
   }
 
   await page.getByRole('button', { name: 'Projects' }).click()
-  await expect(page.getByRole('heading', { level: 3, name: 'Control Plane' })).toBeVisible()
-
-  const overviewResponse = await request.get('/api/overview')
-  expect(overviewResponse.ok()).toBeTruthy()
-  const overview = (await overviewResponse.json()) as {
-    projects: Array<{ projectId: string }>
-  }
-  const projectId = overview.projects[0]?.projectId
-  expect(projectId).toBeTruthy()
+  await expect(
+    page.getByRole('heading', { level: 3, name: projectName ?? '' }),
+  ).toBeVisible()
+  // The app renders API failures in its application .error element.
+  await expect(page.locator('.error')).toHaveCount(0)
 
   const executeResponse = await request.post('/api/operations/execute', {
     data: {
@@ -58,10 +72,19 @@ test('overview, badge, Projects and Execution History render from same-origin re
   await expect(
     page.getByRole('cell', { name: fabricatedOperationId, exact: true }),
   ).toBeVisible()
+  await expect(page.locator('.error')).toHaveCount(0)
 
   expect(pageErrors, `page errors: ${pageErrors.join('; ')}`).toEqual([])
   expect(apiRequests.length).toBeGreaterThan(0)
+
   for (const requestUrl of apiRequests) {
     expect(new URL(requestUrl).origin).toBe(baseOrigin)
+  }
+  for (const response of apiResponses) {
+    expect(
+      new URL(response.url).origin,
+      `cross-origin API response: ${response.url}`,
+    ).toBe(baseOrigin)
+    expect(response.status, `API response failed: ${response.url}`).toBeLessThan(400)
   }
 })

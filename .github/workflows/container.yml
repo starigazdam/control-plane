@@ -8,8 +8,18 @@ on:
       - 'compose.yaml'
       - 'deployment/**'
       - 'docs/container-dev.md'
-      - 'src/ControlPlane.Api/**'
-      - 'src/ControlPlane.ServiceDefaults/**'
+      - 'src/**'
+      - 'global.json'
+      - 'nuget.config'
+      - 'NuGet.config'
+      - 'NuGet.Config'
+      - '**/nuget.config'
+      - '**/NuGet.config'
+      - '**/NuGet.Config'
+      - 'Directory.*.props'
+      - 'Directory.*.targets'
+      - '**/Directory.*.props'
+      - '**/Directory.*.targets'
       - 'ui/**'
       - 'tests/container/**'
       - 'tests/ControlPlane.Api.Tests/**'
@@ -22,8 +32,18 @@ on:
       - 'compose.yaml'
       - 'deployment/**'
       - 'docs/container-dev.md'
-      - 'src/ControlPlane.Api/**'
-      - 'src/ControlPlane.ServiceDefaults/**'
+      - 'src/**'
+      - 'global.json'
+      - 'nuget.config'
+      - 'NuGet.config'
+      - 'NuGet.Config'
+      - '**/nuget.config'
+      - '**/NuGet.config'
+      - '**/NuGet.Config'
+      - 'Directory.*.props'
+      - 'Directory.*.targets'
+      - '**/Directory.*.props'
+      - '**/Directory.*.targets'
       - 'ui/**'
       - 'tests/container/**'
       - 'tests/ControlPlane.Api.Tests/**'
@@ -44,19 +64,30 @@ jobs:
     timeout-minutes: 30
     env:
       IMAGE_TAG: control-plane
+      # The delivery gate is bound to the exact PR head. On pull_request events
+      # github.sha is the synthetic merge ref, so the build uses the head sha
+      # instead. Push and manual runs keep the event sha.
+      BUILD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Report the source commit under test
+        run: |
+          echo "Source commit under test: ${BUILD_SHA}"
+          echo "Check-run event SHA: ${GITHUB_SHA}"
 
       - name: Valid BUILD_SHA builds an identified image
         run: |
           set -euo pipefail
-          docker build --build-arg BUILD_SHA="${GITHUB_SHA}" -t "${IMAGE_TAG}:valid" .
+          docker build --build-arg BUILD_SHA="${BUILD_SHA}" -t "${IMAGE_TAG}:valid" .
           docker image inspect "${IMAGE_TAG}:valid" >/dev/null
 
       - name: Missing, empty and malformed BUILD_SHA fail with no produced image
         run: |
           set -euo pipefail
-          cases="missing: empty: malformed:not-a-sha uppercase:${GITHUB_SHA^^} short:${GITHUB_SHA:0:39}"
+          cases="missing: empty: malformed:not-a-sha uppercase:${BUILD_SHA^^} short:${BUILD_SHA:0:39}"
           for entry in $cases; do
             name="${entry%%:*}"
             value="${entry#*:}"
@@ -77,6 +108,121 @@ jobs:
           done
           echo "Every invalid BUILD_SHA input failed the build with no produced image"
 
+  dockerignore-context:
+    name: Docker context exclusions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BUILD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Report the source commit under test
+        run: |
+          echo "Source commit under test: ${BUILD_SHA}"
+          echo "Check-run event SHA: ${GITHUB_SHA}"
+
+      - name: Prove root .dockerignore excludes nested dotenv, local and database files
+        run: |
+          set -euo pipefail
+          fixture_root="src/ControlPlane.Api/.dockerignore-regression-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          fixture_dirs=(
+            "${fixture_root}"
+            "${fixture_root}/dotenv"
+            "${fixture_root}/local"
+            "${fixture_root}/database"
+            "${fixture_root}/safe"
+          )
+          fixture_files=(
+            "${fixture_root}/dotenv/.env"
+            "${fixture_root}/dotenv/.env.local"
+            "${fixture_root}/dotenv/secret.env"
+            "${fixture_root}/local/values.local"
+            "${fixture_root}/database/state.db"
+            "${fixture_root}/database/state.db-shm"
+            "${fixture_root}/database/state.db-wal"
+            "${fixture_root}/database/state.sqlite"
+            "${fixture_root}/database/state.sqlite-wal"
+            "${fixture_root}/database/state.sqlite3"
+            "${fixture_root}/database/state.sqlite3-wal"
+            "${fixture_root}/safe/.env.example"
+          )
+          # Paths as Docker's export lists them after the context is copied to
+          # /context. Excluded paths must be absent; the safe template must be
+          # present.
+          excluded_paths=(
+            "context/${fixture_root}/dotenv/.env"
+            "context/${fixture_root}/dotenv/.env.local"
+            "context/${fixture_root}/dotenv/secret.env"
+            "context/${fixture_root}/local/values.local"
+            "context/${fixture_root}/database/state.db"
+            "context/${fixture_root}/database/state.db-shm"
+            "context/${fixture_root}/database/state.db-wal"
+            "context/${fixture_root}/database/state.sqlite"
+            "context/${fixture_root}/database/state.sqlite-wal"
+            "context/${fixture_root}/database/state.sqlite3"
+            "context/${fixture_root}/database/state.sqlite3-wal"
+          )
+          safe_path="context/${fixture_root}/safe/.env.example"
+          image_tag="control-plane:context-check-${GITHUB_RUN_ID}"
+          container_id=""
+
+          cleanup() {
+            local status=$?
+            if [ -n "${container_id}" ]; then
+              docker rm --force "${container_id}" >/dev/null 2>&1 || true
+            fi
+            docker image rm --force "${image_tag}" >/dev/null 2>&1 || true
+            for file in "${fixture_files[@]}"; do
+              rm -f -- "${file}"
+            done
+            for (( index=${#fixture_dirs[@]}-1; index>=0; index-- )); do
+              if [ -d "${fixture_dirs[index]}" ]; then
+                rmdir -- "${fixture_dirs[index]}" || true
+              fi
+            done
+            exit "${status}"
+          }
+          trap cleanup EXIT
+
+          for path in "${fixture_dirs[@]}" "${fixture_files[@]}"; do
+            if [ -e "${path}" ]; then
+              echo "::error::fixture path already exists: ${path}"
+              exit 1
+            fi
+          done
+
+          for dir in "${fixture_dirs[@]}"; do
+            mkdir -p -- "${dir}"
+          done
+          for file in "${fixture_files[@]}"; do
+            printf 'FABRICATED fixture; not a real secret.\n' > "${file}"
+          done
+
+          # Copy the entire build context through Docker and inspect exactly
+          # which paths Docker included, not the final production image.
+          docker build --file - --tag "${image_tag}" . <<'DOCKERFILE'
+          FROM scratch
+          COPY . /context
+          DOCKERFILE
+
+          container_id="$(docker create "${image_tag}" /dockerignore-context-check)"
+          listing="$(docker export "${container_id}" | tar -t)"
+
+          for path in "${excluded_paths[@]}"; do
+            if grep -qxF -- "${path}" <<<"${listing}"; then
+              echo "::error::excluded path leaked into the Docker context: ${path}"
+              exit 1
+            fi
+          done
+          if ! grep -qxF -- "${safe_path}" <<<"${listing}"; then
+            echo "::error::safe nested .env.example was excluded from the Docker context: ${safe_path}"
+            exit 1
+          fi
+          echo "Root .dockerignore excludes nested dotenv, local and database files while keeping the safe .env.example template"
+
   container:
     name: Container smoke
     runs-on: ubuntu-latest
@@ -85,11 +231,19 @@ jobs:
       IMAGE: control-plane:ci-container-${{ github.run_id }}
       COMPOSE_PROJECT: cp-container-${{ github.run_id }}
       HOST_PORT: '18080'
+      BUILD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Report the source commit under test
+        run: |
+          echo "Source commit under test: ${BUILD_SHA}"
+          echo "Check-run event SHA: ${GITHUB_SHA}"
 
       - name: Build the image with the commit identity
-        run: docker build --build-arg BUILD_SHA="${GITHUB_SHA}" -t "${IMAGE}" .
+        run: docker build --build-arg BUILD_SHA="${BUILD_SHA}" -t "${IMAGE}" .
 
       - name: Start the service through Compose
         run: |
@@ -102,7 +256,7 @@ jobs:
       - name: Verify the served build identity
         run: >-
           python3 tests/container/verify_api.py version
-          --url "http://127.0.0.1:${HOST_PORT}" --expect-sha "${GITHUB_SHA}"
+          --url "http://127.0.0.1:${HOST_PORT}" --expect-sha "${BUILD_SHA}"
 
       - name: Verify compiled UI serving and 404 behavior
         run: |
@@ -178,11 +332,19 @@ jobs:
       IMAGE: control-plane:ci-persistence-${{ github.run_id }}
       COMPOSE_PROJECT: cp-persistence-${{ github.run_id }}
       HOST_PORT: '18081'
+      BUILD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Report the source commit under test
+        run: |
+          echo "Source commit under test: ${BUILD_SHA}"
+          echo "Check-run event SHA: ${GITHUB_SHA}"
 
       - name: Build the image with the commit identity
-        run: docker build --build-arg BUILD_SHA="${GITHUB_SHA}" -t "${IMAGE}" .
+        run: docker build --build-arg BUILD_SHA="${BUILD_SHA}" -t "${IMAGE}" .
 
       - name: Start the service on an empty named volume
         run: |
@@ -236,11 +398,19 @@ jobs:
       IMAGE: control-plane:ci-browser-${{ github.run_id }}
       COMPOSE_PROJECT: cp-browser-${{ github.run_id }}
       HOST_PORT: '18082'
+      BUILD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Report the source commit under test
+        run: |
+          echo "Source commit under test: ${BUILD_SHA}"
+          echo "Check-run event SHA: ${GITHUB_SHA}"
 
       - name: Build the image with the commit identity
-        run: docker build --build-arg BUILD_SHA="${GITHUB_SHA}" -t "${IMAGE}" .
+        run: docker build --build-arg BUILD_SHA="${BUILD_SHA}" -t "${IMAGE}" .
 
       - name: Start the service through Compose
         run: |
@@ -268,7 +438,7 @@ jobs:
         working-directory: ui
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:${{ env.HOST_PORT }}
-          PLAYWRIGHT_BUILD_SHA: ${{ github.sha }}
+          PLAYWRIGHT_BUILD_SHA: ${{ env.BUILD_SHA }}
         run: npm run test:e2e
 
       - name: Clean up job-owned containers and network

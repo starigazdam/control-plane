@@ -112,11 +112,18 @@ public sealed class ApiHostTests : IDisposable
         SetEnvironment("ContainerHosting__Enabled", "true");
 
         using var factory = CreateFactoryWithConfiguredHttpsPort();
-        using var client = factory.CreateClient();
+        // The default client follows redirects, so a followed redirect could
+        // still look like a 200. Disable auto-redirect to prove that no
+        // redirect happened at all.
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
 
-        using var response = await client.GetAsync("/api/version");
+        using var response = await client.GetAsync("http://localhost/api/version");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(response.Headers.Location);
     }
 
     [Fact]

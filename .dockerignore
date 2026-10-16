@@ -3,19 +3,23 @@
 .gitattributes
 .gitignore
 
-# Local dotenv files and secrets. No dotenv file is copied into the image.
-.env
-.env.*
-*.env
-*.local
-!.env.example
+# Local dotenv files and secrets at any depth. The build context is recursive,
+# so these patterns must match nested paths too. No dotenv file is copied into
+# the image; the secret-free .env.example templates are re-included last.
+**/.env
+**/.env.*
+**/*.env
+**/*.local
 
-# Local runtime databases and test evidence
-*.db
-*.db-shm
-*.db-wal
-*.sqlite
-*.sqlite3
+# Local runtime databases and their sidecars at any depth
+**/*.db
+**/*.db-*
+**/*.sqlite
+**/*.sqlite-*
+**/*.sqlite3
+**/*.sqlite3-*
+
+# Test evidence
 **/TestResults/
 **/*.trx
 **/*.coverage
@@ -38,3 +42,7 @@ Thumbs.db
 
 # Tests and their fixtures are not needed to build the image
 tests/
+
+# Keep the safe, secret-free dotenv template at any depth. This must stay last
+# so it wins over the recursive dotenv exclusions above.
+!**/.env.example

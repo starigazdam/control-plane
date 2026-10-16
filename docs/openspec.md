@@ -85,16 +85,30 @@ npm exec --yes --package=@fission-ai/openspec@1.14.2 -- openspec new change "you
 
 ## Workflow
 
+Plan first, review the plan, then implement. [`.hermes.md`](../.hermes.md) is
+the canonical rule; this section adds the OpenSpec-specific detail.
+
 1. Explore and refine the problem. Use the `openspec-explore` skill to think
    through options and constraints.
 2. Write the change artifacts: a proposal, a spec delta, a design, and tasks.
-   Use the `openspec-propose` skill.
-3. Get human approval of the design before any implementation.
-4. Implement only under separate, explicit authorization. Add tests with the
+   Use the `openspec-propose` skill. Baseline specs keep describing existing
+   behavior only.
+3. Get an independent high-capability review of those artifacts. Use the named
+   reviewer when the maintainer selects one, and do not pin a specific model
+   globally. Confirm the actual model and provider, and bind the approval to
+   the reviewed revision. Resolve blocking findings; re-review a materially
+   changed specification.
+4. Get explicit human approval of the reviewed design before any
    implementation.
-5. Require green CI, independent high-capability review, and human merge
-   approval, per [`.hermes.md`](../.hermes.md).
-6. Sync and archive the change only after evidence-backed completion.
+5. Implement only under a separate, explicit authorization. A general
+   start/build request, an issue selection, an approved proposal, or merged
+   planning artifacts does not authorize apply. Never combine initial proposal
+   creation and implementation in one worker run. Add tests with the
+   implementation.
+6. Require exact-head CI, independent final review, and human merge approval
+   before merge. Sync and archive only after evidence-backed completion. A
+   specification review does not approve unimplemented code, deployment,
+   merge, or archive.
 
 A proposal-only pull request does not close a feature issue. Planning artifacts
 are not implementation. Applying a change, archiving it, and merging it are

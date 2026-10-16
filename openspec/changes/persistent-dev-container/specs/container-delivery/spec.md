@@ -116,18 +116,34 @@ or the tabs.
 - **WHEN** the version request fails or returns missing, null, wrong-type, or invalid data
 - **THEN** the UI shows `Build unknown` and the overview and tabs remain usable
 
-### Requirement: Persist application data in a named SQLite volume
+### Requirement: Run one control-plane service with a named SQLite volume
 
 The Compose definition SHALL run exactly one control-plane service with a named
 SQLite volume mounted at `/data`. An empty volume SHALL initialize the database
-on first start. Existing project and execution-history records SHALL survive
-service restart and container recreation with the same volume. The service SHALL
-prepare writable ownership for the non-root runtime user.
+on first start, using the existing auto-created placeholder project. The service
+SHALL prepare writable ownership for the non-root runtime user.
 
 #### Scenario: Empty volume initializes the database
 
 - **WHEN** the service starts against an empty named volume
 - **THEN** the database is created under `/data` and the service serves data
+
+#### Scenario: Placeholder project is auto-created on read
+
+- **WHEN** the overview or project endpoint is read against an empty volume
+- **THEN** the existing placeholder project is created and returned, and no separate project-creation API is used
+
+#### Scenario: Non-root process writes to the volume
+
+- **WHEN** the service runs as its non-root runtime user
+- **THEN** it can create and update the database files in the mounted volume
+
+### Requirement: Preserve records without adding a persistence surface
+
+Existing project and execution-history records SHALL survive service restart and
+container recreation with the same volume. This change SHALL NOT add a
+create-project endpoint, direct database seeding, new schema or CRUD, or a new
+operation.
 
 #### Scenario: Records survive restart
 
@@ -139,19 +155,14 @@ prepare writable ownership for the non-root runtime user.
 - **WHEN** the container is recreated with the same named volume
 - **THEN** the previously written records remain present with the same project identity, correlation id, and operation id
 
-#### Scenario: Non-root process writes to the volume
-
-- **WHEN** the service runs as its non-root runtime user
-- **THEN** it can create and update the database files in the mounted volume
-
 ### Requirement: Require explicit image and bind configuration
 
 The Compose definition SHALL require an explicit `CONTROL_PLANE_IMAGE` reference
 and SHALL NOT build an image implicitly. `CONTROL_PLANE_BIND_ADDRESS` SHALL
 default to loopback and `CONTROL_PLANE_PORT` SHALL default to 8080. The
-application SHALL listen on container HTTP port 8080 without a redirect loop. An
-exposed host port MUST bind only the explicitly selected interface and MUST NOT
-bind all interfaces by default.
+application SHALL listen on container HTTP port 8080. An exposed host port MUST
+bind only the explicitly selected interface and MUST NOT bind all interfaces by
+default.
 
 #### Scenario: Missing image reference is rejected
 
@@ -168,24 +179,50 @@ bind all interfaces by default.
 - **WHEN** an operator supplies a private-network interface as `CONTROL_PLANE_BIND_ADDRESS`
 - **THEN** the exposed port is bound to that interface only
 
-#### Scenario: Container HTTP works without a redirect loop
+### Requirement: Gate HTTPS redirection on an explicit container hosting switch
 
-- **WHEN** a client calls the container over HTTP
-- **THEN** the request is served without an HTTP-to-HTTPS redirect loop
+The container SHALL start with exactly one explicit hosting switch set to enabled
+(`ContainerHosting__Enabled=true`, read from the `ContainerHosting` configuration
+section). When the switch is absent the process SHALL default it to false and
+SHALL preserve existing behavior, including Aspire development. When the switch
+is enabled the process SHALL NOT perform unconditional HTTPS redirection. The
+switch SHALL NOT add a framework or readiness endpoint.
+
+#### Scenario: Enabled hosting switch serves container HTTP without HTTPS redirection
+
+- **WHEN** the container starts with `ContainerHosting__Enabled=true` and a client calls the container over HTTP
+- **THEN** the request is served without an unconditional HTTPS redirect
+
+#### Scenario: Missing switch preserves existing behavior
+
+- **WHEN** `ContainerHosting__Enabled` is absent
+- **THEN** the process treats it as false and existing deployments, including Aspire development, keep their current behavior
+
+### Requirement: Omit Development-only middleware and endpoints in the production container
+
+In the production container (`ASPNETCORE_ENVIRONMENT=Production`), Swagger UI and
+the OpenAPI middleware, the developer exception page, and the `/health` and
+`/alive` mappings SHALL be absent.
+
+#### Scenario: Production container omits Development-only middleware and endpoints
+
+- **WHEN** the production container runs
+- **THEN** Swagger UI and the OpenAPI middleware, the developer exception page, and the `/health` and `/alive` mappings are not served
 
 ### Requirement: Scope image build context and final image contents
 
-The image build context SHALL exclude local `.env` variants, local databases,
-Git metadata, local build-cache directories (`bin`, `obj`, `dist`,
-`node_modules`), and test evidence. The final image SHALL contain the compiled
-UI, the published application, and the required runtime libraries, and SHALL
-exclude secrets, local runtime data, source dependency caches, and build
-toolchains.
+The image build context SHALL exclude both the committed `.env` and local dotenv
+variants, local databases, Git metadata, local build-cache directories (`bin`,
+`obj`, `dist`, `node_modules`), and test evidence; no dotenv file SHALL be copied
+into the final image. The final image SHALL contain the compiled UI, the
+published application, and the required runtime libraries, and SHALL exclude
+secrets, local runtime data, source dependency caches, and build toolchains.
 
 #### Scenario: Build context excludes sensitive and local files
 
 - **WHEN** the image is built
-- **THEN** local `.env` variants, local databases, Git metadata, local `bin`, `obj`, `dist`, and `node_modules`, and test evidence are excluded from the build context
+- **THEN** both the committed `.env` and local dotenv variants, local databases, Git metadata, local `bin`, `obj`, `dist`, and `node_modules`, and test evidence are excluded from the build context
+- **AND** no dotenv file is copied into the final image
 
 #### Scenario: Final image keeps required output and drops what it must not ship
 
@@ -194,41 +231,59 @@ toolchains.
 
 ### Requirement: Keep delivered configuration inert
 
-The delivered development configuration SHALL keep the Copilot agent disabled,
-SHALL NOT include live credentials, and SHALL NOT activate real external
-operations or automated calls to the execute endpoint.
+The delivered development configuration SHALL keep the Copilot agent disabled
+through the existing `CopilotAgent__Enabled=false` setting, SHALL NOT include
+live credentials, and SHALL NOT activate real external operations or automated
+calls to the execute endpoint. The setting is not authentication.
 
 #### Scenario: Delivered configuration stays inert
 
 - **WHEN** the delivered development service starts
-- **THEN** the Copilot agent is disabled, no live credentials are present, and no real external operation is activated
+- **THEN** the Copilot agent is disabled through the existing `CopilotAgent__Enabled=false` setting, no live credentials are present, and no real external operation is activated
 
-### Requirement: Verify the container data path with fabricated records
+### Requirement: Verify the container data path with fabricated records only
 
 Container acceptance SHALL run against a real built container and SHALL use only
 fabricated records and a rejected unknown operation, with no live cloud, broker,
-or agent call. The check SHALL record the seeded row's correlation id, operation
-id, and project before restart and SHALL verify the same records after restart.
-Success MUST NOT be inferred from a 200 status or a nonempty result alone. Count
-preservation is scoped to the isolated fixture with no concurrent writer.
-
-#### Scenario: Seeded records are verified after restart
-
-- **WHEN** a fabricated record and a rejected unknown operation are written, the service is restarted, and history is read
-- **THEN** the same correlation id, operation id, and project are present with a preserved count
+or agent call. It SHALL NOT create a project, seed the database directly, add
+schema or CRUD, or add a new operation. Success MUST NOT be inferred from a 200
+status or a nonempty result alone.
 
 #### Scenario: No live external action is taken
 
 - **WHEN** container acceptance runs
 - **THEN** it makes no live cloud, broker, or agent call
 
+### Requirement: Use the placeholder project identity for the persistence check
+
+The check SHALL read the existing auto-created placeholder project through the
+current overview or project endpoint and SHALL use that identity as the request's
+project id.
+
+#### Scenario: Placeholder project identity is used as the request project id
+
+- **WHEN** the check reads the overview or project endpoint
+- **THEN** it obtains the existing placeholder project identity and uses it as the project id for the rejected unknown operation
+
+### Requirement: Verify the persisted history tuple across restart and recreation
+
+The check SHALL post one rejected unknown operation with a fabricated correlation
+id and SHALL record the exact history tuple (project, correlation id, operation
+id) and count before restart. It SHALL then verify the same tuple and count after
+both a restart and a container recreation with the same named volume. Count
+preservation is scoped to the isolated fixture with no concurrent writer.
+
+#### Scenario: Seeded records are verified after restart and recreation
+
+- **WHEN** a rejected unknown operation is written with a fabricated correlation id, the service is restarted, and then the container is recreated with the same volume
+- **THEN** the same project, correlation id, operation id, and count are present
+
 ### Requirement: Verify browser acceptance against the exact tested build
 
 Browser acceptance SHALL exercise a real container and SHALL verify the overview
 data, the build badge, the Projects and Execution History views, same-origin
 default requests, and the absence of application load failures. The container
-smoke check SHALL assert the exact build identity that was built. This coverage
-is new and is not existing evidence.
+smoke check SHALL assert the exact build identity that was built.
 
 #### Scenario: Browser walkthrough succeeds against the tested image
 
@@ -240,21 +295,14 @@ is new and is not existing evidence.
 - **WHEN** the container smoke check runs
 - **THEN** it confirms the served version matches the exact build identity that was built
 
-### Requirement: Define generic outcomes for a separate host deployment
+### Requirement: Keep public artifacts free of private deployment details
 
-A standing deployment SHALL be delivered as a separately reviewed configuration
-in a separate deployment-configuration repository. Public artifacts SHALL state
-only generic outcomes, SHALL NOT disclose the real environment, and SHALL NOT
-claim that this repository implements that configuration or that live readiness
-was verified.
-
-#### Scenario: Generic deployment outcomes are stated
-
-- **WHEN** the deployment configuration is described in public artifacts
-- **THEN** it names interface selection, port reservation, service registration, image selection, startup, restart survival, and direct browser access as outcomes to be provided by the separately reviewed companion configuration
-- **AND** it states that the companion configuration is prepared and statically checked separately and that live startup, direct browser access, and restart verification run only under separate live authorization
+Public artifacts SHALL state only generic outcomes, SHALL NOT disclose a real
+host, address, credential, environment topology, or runtime data, and SHALL NOT
+claim that this repository implements the companion host deployment or that live
+readiness was verified.
 
 #### Scenario: No real environment or live claim is disclosed
 
-- **WHEN** the deployment configuration is described in public artifacts
-- **THEN** no real host, address, credential, or topology is disclosed and no live readiness is claimed
+- **WHEN** the development deployment or its companion configuration is described in public artifacts
+- **THEN** no real host, address, credential, topology, or runtime data is disclosed and no live readiness is claimed

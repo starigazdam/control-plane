@@ -67,6 +67,7 @@ The inspected baseline is source revision
 | UI build badge | None | Accessible badge; degrades to `Build unknown` |
 | Persistence | SQLite file next to the API, or Aspire Postgres | Named SQLite volume at `/data`, survives restart/recreate |
 | Image/bind config | Aspire-managed | `CONTROL_PLANE_IMAGE`, loopback-default bind, port 8080 |
+| Hosting mode | `UseHttpsRedirection()` unconditional; `IsDevelopment()` gates Swagger, developer exception page, `/health`, `/alive` | Compose sets `ContainerHosting__Enabled=true` and `ASPNETCORE_ENVIRONMENT=Production`; the enabled switch bypasses HTTPS redirection and the Production environment leaves Development-only middleware and endpoints absent |
 | Aspire path | Canonical dev entry point | Unchanged; still canonical for development and tests |
 
 The baseline specs `plugin-registration` and `operation-execution` are
@@ -135,24 +136,55 @@ unchanged. All new behavior belongs to the `container-delivery` delta.
    a local image or selects an already available approved image. Avoid
    `container_name` so test projects remain isolated.
 
-9. **Bind and port.** `CONTROL_PLANE_BIND_ADDRESS` defaults to loopback;
-   `CONTROL_PLANE_PORT` defaults to 8080. The application listens on container
-   HTTP port 8080 and container HTTP must work without a redirect loop.
-   Production container mode must not call unconditional
-   `UseHttpsRedirection()`; existing development behavior is preserved outside
-   that mode. No default all-interface bind.
+9. **Bind, port, and one explicit container hosting switch.**
+   `CONTROL_PLANE_BIND_ADDRESS` defaults to loopback and `CONTROL_PLANE_PORT`
+   defaults to 8080; the application listens on container HTTP port 8080 and no
+   default all-interface bind is used. Container mode is selected by exactly one
+   proposed switch: the boolean `ContainerHosting__Enabled`, read from the
+   `ContainerHosting` configuration section, which defaults to false when
+   absent. Compose sets `ContainerHosting__Enabled=true` and also sets
+   `ASPNETCORE_ENVIRONMENT=Production`. When the switch is enabled the process
+   bypasses the currently unconditional `UseHttpsRedirection()` call. When the
+   switch is absent or false, existing Aspire development, tests, and other
+   deployments keep their current behavior unchanged. Because
+   `ASPNETCORE_ENVIRONMENT=Production` also leaves the existing `IsDevelopment()`
+   gates closed, the production container is expected to omit Swagger UI and the
+   OpenAPI middleware, the developer exception page, and the `/health` and
+   `/alive` mappings; these are proposed future behaviors, not present
+   implementation. `src/ControlPlane.ServiceDefaults/Extensions.cs` stays
+   unchanged and no new framework or readiness endpoint is added. The HTTPS
+   redirect risk is conditional: `UseHttpsRedirection()` only redirects when an
+   HTTPS port is configured, and without one it logs a warning and does not
+   redirect. The switch keeps container HTTP free of that conditional redirect
+   without claiming a redirect loop or startup failure is inevitable.
 
-10. **Generic interpolation example.** `deployment/env.example` is a generic
-    Compose interpolation example limited to three interpolation keys: image,
-    bind address, and port. Do not copy or inject a whole host environment file.
-    Application settings do not belong in that example: the SQLite provider and
-    database path, and the disabled Copilot agent, are set explicitly in
-    `compose.yaml`. Never enable real external operations or copy live
-    credentials for this development deployment.
+10. **Generic interpolation example and explicit Compose settings.**
+    `deployment/env.example` is a generic Compose interpolation example limited
+    to three interpolation keys: image, bind address, and port. Do not copy or
+    inject a whole host environment file and do not use `env_file`.
+    Application settings do not belong in that example; the Compose service
+    owns them explicitly: `ASPNETCORE_ENVIRONMENT=Production`,
+    `ContainerHosting__Enabled=true`, `Database__Provider=Sqlite`,
+    `ConnectionStrings__ControlPlane=Data Source=/data/control-plane.db`, the
+    existing `CopilotAgent__Enabled=false`, and the container HTTP port.
+    `CopilotAgent__Enabled` is an existing key, not a new toggle:
+    `CopilotAgentSettings.SectionName` is `CopilotAgent` and `Enabled` defaults
+    to `false`; `ServiceCollectionExtensions` binds that section, and the
+    Copilot Agent status provider and both Copilot operations read `Enabled`.
+    Setting it to `false` leaves the existing Copilot Agent plugin and its two
+    operation contracts unchanged; it is not authentication, and it does not add
+    disable switches to the other four plugins. All other settings fall back to
+    the baked `appsettings.json` and class defaults. The existing external
+    environment precedence in `Program.cs` is unchanged; because no dotenv file
+    ships in the image, its loader finds none. Never enable real external
+    operations or copy live credentials for this development deployment.
 
-11. **Build-context and image hygiene.** The build context excludes local
-    `.env` variants, local databases, Git metadata, local
-    `bin`/`obj`/`dist`/`node_modules`, and test evidence. The final image contains
+11. **Build-context and image hygiene.** The build context excludes both the
+    committed `.env` and local dotenv variants, local databases, Git metadata,
+    local `bin`/`obj`/`dist`/`node_modules`, and test evidence. No dotenv file is
+    copied into the final image. Those exclusions apply to source inputs in the
+    context and must not exclude compiled output produced within build stages or
+    runtime dependencies that the final image requires. The final image contains
     the compiled UI, the published application, and required runtime libraries,
     and excludes secrets, local runtime databases and evidence, source
     dependency caches, build toolchains, and unnecessary development assets.
@@ -176,7 +208,8 @@ unchanged. All new behavior belongs to the `container-delivery` delta.
 Exact paths in the current tree. "New" means the file does not exist yet.
 
 - Existing to modify: `src/ControlPlane.Api/Program.cs` (static-file serving,
-  production HTTP behavior, version endpoint registration),
+  the `ContainerHosting` switch defaulting to false and its effect on production
+  HTTP behavior, version endpoint registration),
   `ui/src/App.tsx` (same-origin default and build badge),
   `ui/src/App.test.tsx` (badge and fallback coverage), and `ui/package.json` only
   if one browser-test dev dependency is needed.
@@ -216,29 +249,62 @@ automated CI or separately authorized live only.
 | Build identity | Build with valid and invalid `BUILD_SHA` -> build twice -> valid build succeeds with recorded SHA; invalid build fails | Automated |
 | Version endpoint | Run image and local build -> `GET /api/version` -> `{ "commitSha": <sha> }` in the image and `unknown` locally | Automated |
 | UI badge | Serve valid, then unavailable, version data -> load UI -> badge shows commit with accessible full SHA, or `Build unknown` without blocking tabs | Automated |
-| Volume persistence | Start with an empty named volume -> write fabricated records and a rejected unknown operation, restart, recreate -> same correlation id, operation id, project, and count | Automated |
+| Volume persistence | Start with an empty named volume -> read the auto-created placeholder project through `/api/overview` or `/api/projects/{id}`, post one rejected fabricated unknown operation with that project id and a fabricated correlation id, record the exact history tuple and count, restart, recreate with the same volume -> same project, correlation id, operation id, and count | Automated |
 | Bind safety | Start without a bind address -> inspect listener -> loopback only, no all-interface bind | Automated |
+| Container hosting mode | Start the Compose service -> request `/` and `/health` over HTTP -> HTTP is served without an HTTPS redirect, and Swagger/OpenAPI, the developer exception page, and `/health` and `/alive` are absent | Automated |
+| Non-hosted default preserved | Run without `ContainerHosting__Enabled` (Aspire development) -> call the API -> existing HTTPS-redirection and Development middleware/endpoint behavior is unchanged | Automated |
 | No secrets or live actions | Inspect build context and delivered image -> context omits local env/db/vcs/build-cache/test evidence; image has compiled UI, published app, and runtime libs, with no secrets, local runtime databases/evidence, source caches, or build toolchains | Automated |
 | Browser walkthrough | Run browser acceptance against the tested image -> overview, badge, Projects, Execution History, same-origin requests, no load failures | Automated |
 | Smoke build identity | Run smoke check -> served version equals the exact built identity | Automated |
 | Host deployment | Separately reviewed configuration in another repository -> selected private interface, reserved port, service record, image selection, startup/restart/direct-access verification | Separately authorized live only |
 
 Acceptance uses only fabricated records. It never makes a live cloud, broker, or
-agent call. The persistence check records the seeded row's correlation id,
-operation id, and project before restart and verifies those exact values after,
-rather than trusting a 200 status or a nonempty result. Count preservation is
-scoped to the isolated fixture with no concurrent writer. Expected CI cleanup
-of test-owned resources is separate from persistent-volume deletion; there is no
+agent call. This coverage is new and is not existing evidence. The persistence
+check reads the auto-created placeholder project through the existing overview
+or project endpoint, uses that project identity as the request `projectId`, and
+posts one rejected fabricated unknown operation with a fabricated correlation
+id. It records the exact history tuple and count before restart, then verifies
+the same tuple and count after both a restart and a container recreation with
+the same named volume, rather than trusting a 200 status or a nonempty result.
+The rejected unknown-operation path persists the supplied `projectId`,
+`operationId`, and `correlationId` through the existing service before returning
+a rejection; the check does not create a project, seed the database directly,
+add schema or CRUD, or add a new operation, and it does not imply that an
+arbitrary history `projectId` creates a project. Count preservation is scoped to
+the isolated fixture with no concurrent writer. Expected CI cleanup of
+test-owned resources is separate from persistent-volume deletion; there is no
 broad prune and no unapproved live cleanup.
+
+## Companion Host Deployment (documentation-only)
+
+The standing host deployment is a separately reviewed configuration in a
+separate deployment-configuration repository, not part of this repository's
+public product delta. Its static companion boundary and its later live boundary
+are distinct:
+
+- Static companion boundary (unit B, group 4): prepare and statically review the
+  host setup script and service record. It names interface selection, port
+  reservation, service registration, image selection, startup, restart
+  survival, and direct browser access as outcomes the companion configuration
+  provides. It does not start a service.
+- Later live boundary (group 5): live startup, direct browser access, and
+  restart verification run only under separate live authorization.
+
+Public artifacts state only generic outcomes, disclose no real host, address,
+credential, environment topology, or runtime data, and claim no live readiness.
+The companion configuration is prepared and statically checked separately; this
+repository neither implements it nor verifies it live.
 
 ## Risks / Trade-offs
 
 - [An image without a valid build identity could be mistaken for a verified
   artifact] -> Fail the build on missing or malformed `BUILD_SHA` and label the
   metadata as provenance only.
-- [Unconditional HTTPS redirection breaks container HTTP] -> Serve HTTP in the
-  container mode without a redirect loop and keep development behavior
-  unchanged.
+- [Unconditional HTTPS redirection may redirect container HTTP when an HTTPS
+  port is configured] -> Set the explicit container hosting switch so the
+  container bypasses HTTPS redirection, while leaving development behavior
+  unchanged; do not claim a redirect loop or startup failure is inevitable when
+  no HTTPS port is configured.
 - [A SPA catch-all masks unknown API paths] -> Use the standard static-file
   pipeline without a catch-all and assert HTTP 404, not the UI document, for
   unknown API paths.
@@ -269,15 +335,23 @@ broad prune and no unapproved live cleanup.
 
 ## Approval Gates
 
-1. Independent high-capability specification review by Fable, the reviewer named
-   by the maintainer, of this exact artifact revision. This review is PENDING and
-   has not been invoked or approved. A material spec change requires a new Fable
-   review before implementation.
+Gate records live in the issue or pull request discussion and are bound to the
+artifact revision they approve.
+
+1. Independent high-capability specification review by Opus, the reviewer the
+   maintainer named to replace Fable for all remaining reviews of this unit, of
+   this exact corrected artifact revision. This review is PENDING and has not
+   been invoked, performed, or approved. The earlier Fable review of revision
+   c23d3e5 returned REQUEST_CHANGES; that is a historical result, not an Opus
+   review, and not approval. A material spec change requires a new Opus review
+   before implementation.
 2. Human approval of these planning artifacts after the specification review.
 3. Separate authorization before applying the change, split into public
    application delivery (unit A) and the companion deployment configuration
-   (unit B). Each unit waits only for its own authorization; the later live-host
-   gates are not a precondition for application code.
+   (unit B). Unit A requires gates 1 and 2 plus its own unit-A authorization
+   before group 2. Unit B requires gates 1 and 2 plus its own unit-B
+   authorization before group 4. Each unit waits only for its own authorization;
+   the later live-host gates are not a precondition for application code.
 4. Separate live authorization before group 5 live startup, direct browser
    access, and restart verification. Group 4 only prepares and statically
    reviews the setup script and service record and never starts a service.

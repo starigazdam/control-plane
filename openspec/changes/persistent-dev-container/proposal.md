@@ -33,21 +33,28 @@ than depending on a tunnel as the only path.
   label; it records provenance, not a signature or cryptographic attestation.
 - Add a small accessible UI build badge sourced from the version endpoint. Any
   HTTP or network failure, or missing, null, wrong-type, or invalid data,
-  resolves to a `unknown` build value and must not block the overview or tabs.
+  resolves to the literal `Build unknown` (distinct from the version endpoint's
+  `commitSha` literal `unknown`) and must not block the overview or tabs.
 - Add a Compose definition with exactly one control-plane service and one named
   SQLite volume mounted at `/data`. The service requires an explicit
   `CONTROL_PLANE_IMAGE` reference, defaults its bind address to loopback, and
-  listens on container HTTP port 8080. Data must survive restart and container
-  recreation with the same volume.
+  listens on container HTTP port 8080. The service sets an explicit production
+  environment (`ASPNETCORE_ENVIRONMENT=Production`) and an explicit container
+  hosting switch (`ContainerHosting__Enabled=true`, default false when absent)
+  so container HTTP is served without HTTPS redirection while other deployments
+  and Aspire development keep their existing behavior. Data must survive restart
+  and container recreation with the same volume.
 - Add a generic deployment interpolation example limited to image, bind address,
   and port, plus generic container documentation. Keep the SQLite provider and
-  database path and the disabled Copilot agent in `compose.yaml`, not in the
-  three-key example. The image build context excludes local `.env` variants,
-  local databases, Git metadata, local `bin`/`obj`/`dist`/`node_modules`, and
-  test evidence; the final image contains the compiled UI, the published
-  application, and required runtime libraries, and excludes secrets, local
-  runtime databases and evidence, source dependency caches, build toolchains,
-  and unnecessary development assets.
+  database path, the existing `CopilotAgent__Enabled=false` setting, the
+  explicit production environment, and the explicit container hosting switch in
+  `compose.yaml`, not in the three-key example. The image build context excludes
+  both the committed `.env` and local dotenv variants, local databases, Git
+  metadata, local `bin`/`obj`/`dist`/`node_modules`, and test evidence; no dotenv
+  file is copied into the final image. The final image contains the compiled UI,
+  the published application, and required runtime libraries, and excludes
+  secrets, local runtime databases and evidence, source dependency caches, build
+  toolchains, and unnecessary development assets.
 - Add bounded container and browser acceptance coverage in one new focused
   workflow (`.github/workflows/container.yml`) that uses only fabricated records
   and a rejected unknown operation, plus a container smoke path. Browser
@@ -66,14 +73,19 @@ configuration in another repository (host setup, service record, reserved
 port/interface, and image selection). This proposal only requests approval for
 the planning artifacts.
 
-Before any human design approval, this revision requires an independent
-high-capability specification review by Fable, the reviewer named by the
-maintainer. That review is PENDING: it has not been invoked, performed, or
-approved. The review is bound to this artifact revision, so a material spec
-change requires a new Fable review before implementation. Specification review
-is not final implementation review, CI success, merge approval, deployment
-permission, or archive authority. Each unit waits only for its own gate; the
-later live-host authorization is not a precondition for application code.
+Before any human design approval, this corrected revision requires an
+independent high-capability specification review by Opus, the reviewer the
+maintainer named to replace Fable for all remaining reviews of this unit. The
+earlier Fable review of revision c23d3e5 returned REQUEST_CHANGES; that is a
+historical result, not an Opus review, and not approval. The Opus review of this
+corrected revision is PENDING: it has not been invoked, performed, or approved.
+The review is bound to this artifact revision, so a material spec change
+requires a new Opus review before implementation. Specification review is not
+final implementation review, CI success, merge approval, deployment permission,
+or archive authority. Each unit waits only for its own gate; the later live-host
+authorization is not a precondition for application code. Gate records live in
+the issue or pull request discussion and are bound to the artifact revision they
+approve.
 
 ## Capabilities
 
@@ -98,11 +110,13 @@ describe existing behavior that this change does not alter.
   version controller under `src/ControlPlane.Api/Controllers/`, a focused
   container smoke script, and `.github/workflows/container.yml`.
 - Proposed modifications: `src/ControlPlane.Api/Program.cs` (static-file
-  serving and version endpoint registration), `ui/src/App.tsx` and its component
-  tests (build badge and same-origin API default), and `ui/package.json` (one
+  serving, the `ContainerHosting` switch and production middleware set, and
+  version endpoint registration), `ui/src/App.tsx` and its component tests
+  (build badge and same-origin API default), and `ui/package.json` (one
   browser-test dev dependency if required at implementation time).
 - Preserved unchanged: `.github/workflows/ci.yml` and its existing backend, UI,
-  and Aspire gates. No unrelated CI refactor.
+  and Aspire gates, and the `src/ControlPlane.ServiceDefaults/Extensions.cs`
+  development behavior. No unrelated CI refactor.
 - APIs: a new read-only `GET /api/version` returning `{ "commitSha": <string> }`.
   No existing endpoint changes.
 - Dependencies: no pinning of browser or base-image versions is decided here;

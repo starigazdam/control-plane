@@ -1,0 +1,27 @@
+schema: spec-driven
+
+context: |
+  Language: en
+  All artifacts must be written in en.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Project: Control Plane is an ASP.NET Core/.NET backend with a React
+  workbench (Vite, TypeScript). It is a pluggable engineering workbench for
+  operational visibility and one-click actions.
+
+  Project rules:
+  - Keep operations explicit and opinionated; prefer concrete operations over
+    generic operation builders.
+  - ADRs in docs/adr/ retain architecture rationale. Do not restate an accepted
+    ADR as a spec requirement without linking the ADR.
+  - GitHub owns issues, pull requests, CI, and merge approval. A proposal-only
+    pull request does not close a feature issue.
+  - Baseline specs under openspec/specs/ describe existing behavior only.
+    Proposed behavior belongs in an OpenSpec change under openspec/changes/.
+  - Validation is structural only. Passing validation does not approve
+    implementation, merge, or task completion.
+  - No automatic apply, archive, or merge. Apply, archive, and merge require
+    separate implementation authorization plus normal review, green CI, and
+    human approval.
+  - Never disclose credentials, environment topology, private infrastructure
+    references, or private runtime data in any artifact.

@@ -55,6 +55,12 @@ Significant, durable choices are recorded in [Architecture Decision Records](doc
 Read the relevant ADR before changing plugin contracts, operation behavior, or
 agent activation defaults.
 
+## Specs and changes
+
+Baseline specs live in `openspec/specs/` and proposed changes live in
+`openspec/changes/`. See [docs/openspec.md](docs/openspec.md) for the pinned
+commands and the planning-to-merge workflow.
+
 ## Quality gates
 
 CI runs on every pull request and on pushes to `develop`:

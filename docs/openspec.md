@@ -25,21 +25,37 @@ This repository pins the CLI at version `1.14.2`. Do not install it globally.
 Run it through `npm exec` from the repository root. Set `OPENSPEC_TELEMETRY=0`
 and `DO_NOT_TRACK=1` on every invocation.
 
-For readability the snippets below use a short prefix:
-
 ```bash
 export OPENSPEC_TELEMETRY=0
 export DO_NOT_TRACK=1
-alias openspec='npm exec --yes --package=@fission-ai/openspec@1.14.2 -- openspec'
 ```
 
-Check the pinned version:
+The shared skills in `.agents/skills` show bare `openspec <args>` examples.
+Read each one as the full pinned command from the repository root, with those
+opt-outs set:
+
+```bash
+npm exec --yes --package=@fission-ai/openspec@1.14.2 -- openspec <args>
+```
+
+For example, check the pinned version:
 
 ```bash
 npm exec --yes --package=@fission-ai/openspec@1.14.2 -- openspec --version
 ```
 
 Expected output: `1.14.2`.
+
+Some agent clients only run commands that match a permission allowlist. A
+`Bash(openspec:*)` permission does not authorize `npm exec`, so those clients
+may need an entry for the exact pinned invocation above. Keep your client's
+approval boundaries: do not add an `npm` wildcard, change permissions
+automatically, install globally, or wrap the command.
+
+The shared skills live in `.agents/skills`. Not every client discovers that
+directory automatically. If yours does not, open the named shared skill file
+directly. This guide does not configure every client, and it does not change
+global discovery or trust settings.
 
 ## Common commands
 
@@ -76,7 +92,8 @@ npm exec --yes --package=@fission-ai/openspec@1.14.2 -- openspec new change "you
 3. Get human approval of the design before any implementation.
 4. Implement only under separate, explicit authorization. Add tests with the
    implementation.
-5. Require green CI, independent review, and human merge approval.
+5. Require green CI, independent high-capability review, and human merge
+   approval, per [`.hermes.md`](../.hermes.md).
 6. Sync and archive the change only after evidence-backed completion.
 
 A proposal-only pull request does not close a feature issue. Planning artifacts
@@ -116,7 +133,8 @@ Open decisions (not decided here):
 
 - The authentication technology, SDK choice, and transport for identity.
 - The operation schema and any agent-facing projection.
-- Whether identity and subscription are attached per project or globally.
+- Whether agent identity is per-user GitHub/Copilot identity or server-side
+  identity, and the authentication and licensing implications of each.
 
 ### Foundation refinement (#14)
 

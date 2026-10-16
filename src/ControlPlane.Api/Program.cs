@@ -46,6 +46,7 @@ foreach (var name in new[] { ".env", ".env.local" })
 builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.Configure<ProjectSettings>(builder.Configuration.GetSection(ProjectSettings.SectionName));
+builder.Services.Configure<BuildSettings>(builder.Configuration.GetSection(BuildSettings.SectionName));
 
 // Add services to the container.
 builder.Services
@@ -96,7 +97,20 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// Container hosting is an explicit opt-in switch that defaults to false when
+// absent, so existing Aspire development and other deployments are unchanged.
+// When enabled, container HTTP is served without unconditional HTTPS redirection.
+var containerHostingEnabled = app.Configuration.GetValue<bool>($"{ContainerHostingSettings.SectionName}:{nameof(ContainerHostingSettings.Enabled)}");
+if (!containerHostingEnabled)
+{
+    app.UseHttpsRedirection();
+}
+
+// Serve the compiled UI from the default static-file and default-document
+// pipeline. No SPA catch-all is added, so an unmapped API path still returns
+// HTTP 404 rather than the UI document.
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.UseAuthorization();
 

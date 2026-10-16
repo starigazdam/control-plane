@@ -1,0 +1,40 @@
+# Git metadata
+.git
+.gitattributes
+.gitignore
+
+# Local dotenv files and secrets. No dotenv file is copied into the image.
+.env
+.env.*
+*.env
+*.local
+!.env.example
+
+# Local runtime databases and test evidence
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+**/TestResults/
+**/*.trx
+**/*.coverage
+**/coverage*.json
+**/coverage*.xml
+
+# Build caches and dependency caches (compiled output is produced in build stages)
+**/bin/
+**/obj/
+**/dist/
+**/node_modules/
+**/.vite/
+**/.aspire/
+
+# Editor and OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Tests and their fixtures are not needed to build the image
+tests/

@@ -1,0 +1,280 @@
+name: Container
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'compose.yaml'
+      - 'deployment/**'
+      - 'docs/container-dev.md'
+      - 'src/ControlPlane.Api/**'
+      - 'src/ControlPlane.ServiceDefaults/**'
+      - 'ui/**'
+      - 'tests/container/**'
+      - 'tests/ControlPlane.Api.Tests/**'
+      - '.github/workflows/container.yml'
+  push:
+    branches: [develop]
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'compose.yaml'
+      - 'deployment/**'
+      - 'docs/container-dev.md'
+      - 'src/ControlPlane.Api/**'
+      - 'src/ControlPlane.ServiceDefaults/**'
+      - 'ui/**'
+      - 'tests/container/**'
+      - 'tests/ControlPlane.Api.Tests/**'
+      - '.github/workflows/container.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-identity:
+    name: Build identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      IMAGE_TAG: control-plane
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Valid BUILD_SHA builds an identified image
+        run: |
+          set -euo pipefail
+          docker build --build-arg BUILD_SHA="${GITHUB_SHA}" -t "${IMAGE_TAG}:valid" .
+          docker image inspect "${IMAGE_TAG}:valid" >/dev/null
+
+      - name: Missing, empty and malformed BUILD_SHA fail with no produced image
+        run: |
+          set -euo pipefail
+          cases="missing: empty: malformed:not-a-sha uppercase:${GITHUB_SHA^^} short:${GITHUB_SHA:0:39}"
+          for entry in $cases; do
+            name="${entry%%:*}"
+            value="${entry#*:}"
+            tag="${IMAGE_TAG}:invalid-${name}"
+            if [ "$name" = "missing" ]; then
+              if docker build -t "$tag" .; then
+                echo "::error::build unexpectedly succeeded without BUILD_SHA"
+                exit 1
+              fi
+            elif docker build --build-arg "BUILD_SHA=${value}" -t "$tag" .; then
+              echo "::error::build unexpectedly succeeded with a ${name} BUILD_SHA"
+              exit 1
+            fi
+            if docker image inspect "$tag" >/dev/null 2>&1; then
+              echo "::error::an apparently identified image ${tag} was produced for a ${name} BUILD_SHA"
+              exit 1
+            fi
+          done
+          echo "Every invalid BUILD_SHA input failed the build with no produced image"
+
+  container:
+    name: Container smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      IMAGE: control-plane:ci-container-${{ github.run_id }}
+      COMPOSE_PROJECT: cp-container-${{ github.run_id }}
+      HOST_PORT: '18080'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Build the image with the commit identity
+        run: docker build --build-arg BUILD_SHA="${GITHUB_SHA}" -t "${IMAGE}" .
+
+      - name: Start the service through Compose
+        run: |
+          set -euo pipefail
+          export CONTROL_PLANE_IMAGE="${IMAGE}"
+          export CONTROL_PLANE_PORT="${HOST_PORT}"
+          docker compose --project-name "${COMPOSE_PROJECT}" up -d
+          python3 tests/container/verify_api.py wait --url "http://127.0.0.1:${HOST_PORT}"
+
+      - name: Verify the served build identity
+        run: >-
+          python3 tests/container/verify_api.py version
+          --url "http://127.0.0.1:${HOST_PORT}" --expect-sha "${GITHUB_SHA}"
+
+      - name: Verify compiled UI serving and 404 behavior
+        run: |
+          set -euo pipefail
+          python3 tests/container/verify_api.py static --url "http://127.0.0.1:${HOST_PORT}"
+          python3 tests/container/verify_api.py unknown --url "http://127.0.0.1:${HOST_PORT}"
+
+      - name: Verify production omissions
+        run: >-
+          python3 tests/container/verify_api.py omissions
+          --url "http://127.0.0.1:${HOST_PORT}"
+
+      - name: Verify the process runs as non-root
+        run: |
+          set -euo pipefail
+          uid="$(docker compose --project-name "${COMPOSE_PROJECT}" exec -T control-plane id -u)"
+          echo "runtime uid: ${uid}"
+          test "${uid}" != "0"
+
+      - name: Inspect the final image contents
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint sh "${IMAGE}" -c '
+            set -e
+            test -f /app/ControlPlane.Api.dll
+            test -f /app/wwwroot/index.html
+            test -d /app/wwwroot/assets
+            test ! -e /app/.env
+            test ! -e /app/.env.local
+            test ! -e /app/src
+            test ! -e /app/node_modules
+            test ! -d /app/obj
+            test ! -e /app/tests
+            dotnet --list-runtimes | grep -q "Microsoft.AspNetCore.App 10"
+          '
+          test "$(docker image inspect -f '{{.Config.User}}' "${IMAGE}")" = "app"
+          echo "The image ships the UI, the published app and the runtime, without secrets, caches or toolchains"
+
+      - name: Verify loopback-default and selected bind behavior
+        run: |
+          set -euo pipefail
+          host_ips() {
+            python3 -c 'import json, sys; config = json.load(sys.stdin); ports = config["services"]["control-plane"]["ports"]; print(" ".join(sorted({str(port.get("host_ip")) for port in ports})))'
+          }
+          default_bind="$(CONTROL_PLANE_IMAGE="${IMAGE}" CONTROL_PLANE_PORT="${HOST_PORT}" docker compose --project-name "${COMPOSE_PROJECT}" config --format json | host_ips)"
+          echo "default bind: ${default_bind}"
+          test "${default_bind}" = "127.0.0.1" || { echo "::error::default bind is not loopback"; exit 1; }
+          selected_bind="$(CONTROL_PLANE_IMAGE="${IMAGE}" CONTROL_PLANE_PORT="${HOST_PORT}" CONTROL_PLANE_BIND_ADDRESS=127.0.0.2 docker compose --project-name "${COMPOSE_PROJECT}" config --format json | host_ips)"
+          echo "selected bind: ${selected_bind}"
+          test "${selected_bind}" = "127.0.0.2" || { echo "::error::selected bind address was not used as supplied"; exit 1; }
+
+      - name: Reject a missing image reference
+        run: |
+          set -euo pipefail
+          if env -u CONTROL_PLANE_IMAGE docker compose --project-name "${COMPOSE_PROJECT}" config >/dev/null 2>&1; then
+            echo "::error::compose config succeeded without CONTROL_PLANE_IMAGE"
+            exit 1
+          fi
+
+      - name: Clean up job-owned containers and network
+        if: always()
+        run: |
+          set -euo pipefail
+          export CONTROL_PLANE_IMAGE="${IMAGE}"
+          docker compose --project-name "${COMPOSE_PROJECT}" down --remove-orphans || true
+          docker volume rm "${COMPOSE_PROJECT}_control-plane-data" || true
+
+  persistence:
+    name: Persistence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      IMAGE: control-plane:ci-persistence-${{ github.run_id }}
+      COMPOSE_PROJECT: cp-persistence-${{ github.run_id }}
+      HOST_PORT: '18081'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Build the image with the commit identity
+        run: docker build --build-arg BUILD_SHA="${GITHUB_SHA}" -t "${IMAGE}" .
+
+      - name: Start the service on an empty named volume
+        run: |
+          set -euo pipefail
+          export CONTROL_PLANE_IMAGE="${IMAGE}"
+          export CONTROL_PLANE_PORT="${HOST_PORT}"
+          docker compose --project-name "${COMPOSE_PROJECT}" up -d
+          python3 tests/container/verify_api.py wait --url "http://127.0.0.1:${HOST_PORT}"
+
+      - name: Verify the non-root process owns the volume
+        run: |
+          set -euo pipefail
+          uid="$(docker compose --project-name "${COMPOSE_PROJECT}" exec -T control-plane id -u)"
+          echo "runtime uid: ${uid}"
+          test "${uid}" != "0"
+
+      - name: Record the fabricated history tuple before restart
+        run: >-
+          python3 tests/container/verify_api.py seed
+          --url "http://127.0.0.1:${HOST_PORT}" --out persistence-state.json
+
+      - name: Verify the tuple survives a restart
+        run: |
+          set -euo pipefail
+          docker compose --project-name "${COMPOSE_PROJECT}" restart
+          python3 tests/container/verify_api.py wait --url "http://127.0.0.1:${HOST_PORT}"
+          python3 tests/container/verify_api.py verify --url "http://127.0.0.1:${HOST_PORT}" --state persistence-state.json
+
+      - name: Verify the tuple survives container recreation with the same volume
+        run: |
+          set -euo pipefail
+          export CONTROL_PLANE_IMAGE="${IMAGE}"
+          export CONTROL_PLANE_PORT="${HOST_PORT}"
+          docker compose --project-name "${COMPOSE_PROJECT}" up -d --force-recreate
+          python3 tests/container/verify_api.py wait --url "http://127.0.0.1:${HOST_PORT}"
+          python3 tests/container/verify_api.py verify --url "http://127.0.0.1:${HOST_PORT}" --state persistence-state.json
+
+      - name: Clean up job-owned containers, network and volume
+        if: always()
+        run: |
+          set -euo pipefail
+          export CONTROL_PLANE_IMAGE="${IMAGE}"
+          docker compose --project-name "${COMPOSE_PROJECT}" down --remove-orphans || true
+          docker volume rm "${COMPOSE_PROJECT}_control-plane-data" || true
+
+  browser:
+    name: Browser acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      IMAGE: control-plane:ci-browser-${{ github.run_id }}
+      COMPOSE_PROJECT: cp-browser-${{ github.run_id }}
+      HOST_PORT: '18082'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Build the image with the commit identity
+        run: docker build --build-arg BUILD_SHA="${GITHUB_SHA}" -t "${IMAGE}" .
+
+      - name: Start the service through Compose
+        run: |
+          set -euo pipefail
+          export CONTROL_PLANE_IMAGE="${IMAGE}"
+          export CONTROL_PLANE_PORT="${HOST_PORT}"
+          docker compose --project-name "${COMPOSE_PROJECT}" up -d
+          python3 tests/container/verify_api.py wait --url "http://127.0.0.1:${HOST_PORT}"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: Install the browser
+        working-directory: ui
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser acceptance against the built image
+        working-directory: ui
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:${{ env.HOST_PORT }}
+          PLAYWRIGHT_BUILD_SHA: ${{ github.sha }}
+        run: npm run test:e2e
+
+      - name: Clean up job-owned containers and network
+        if: always()
+        run: |
+          set -euo pipefail
+          export CONTROL_PLANE_IMAGE="${IMAGE}"
+          docker compose --project-name "${COMPOSE_PROJECT}" down --remove-orphans || true
+          docker volume rm "${COMPOSE_PROJECT}_control-plane-data" || true

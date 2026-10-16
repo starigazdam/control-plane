@@ -55,7 +55,9 @@ test('overview, badge, Projects and Execution History render from same-origin re
 
   await page.getByRole('button', { name: 'Execution History' }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'Execution History' })).toBeVisible()
-  await expect(page.getByText(fabricatedOperationId)).toBeVisible()
+  await expect(
+    page.getByRole('cell', { name: fabricatedOperationId, exact: true }),
+  ).toBeVisible()
 
   expect(pageErrors, `page errors: ${pageErrors.join('; ')}`).toEqual([])
   expect(apiRequests.length).toBeGreaterThan(0)

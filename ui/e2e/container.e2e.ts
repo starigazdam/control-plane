@@ -26,11 +26,22 @@ test('overview, badge, Projects and Execution History render from same-origin re
   })
   page.on('pageerror', (error) => pageErrors.push(error.message))
 
+  // The application itself requests /api/overview on initial load. Wait for
+  // that page response instead of issuing a second, concurrent request.
+  const overviewResponsePromise = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/overview',
+  )
+
   await page.goto('/')
   const baseOrigin = new URL(page.url()).origin
 
-  const overviewResponse = await request.get('/api/overview')
-  expect(overviewResponse.ok()).toBeTruthy()
+  const overviewResponse = await overviewResponsePromise
+  const overviewStatus = overviewResponse.status()
+  expect(
+    overviewResponse.ok(),
+    `GET /api/overview failed with status ${overviewStatus}`,
+  ).toBeTruthy()
+
   const overview = (await overviewResponse.json()) as {
     projects: Array<{ projectId: string; projectName: string }>
   }
@@ -39,8 +50,8 @@ test('overview, badge, Projects and Execution History render from same-origin re
   expect(projectId).toBeTruthy()
   expect(projectName).toBeTruthy()
 
-  // The header must render the project name the API actually returned. A
-  // fallback label or a failed load would not match.
+  // The header must render the project name from this page response. A fallback
+  // label or a failed load would not match.
   await expect(page.getByTestId('project-name')).toHaveText(projectName ?? '')
   await expect(page.getByTestId('build-badge')).toContainText(/Build ([0-9a-f]{7}|unknown)/)
 

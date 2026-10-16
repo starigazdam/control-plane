@@ -19,6 +19,7 @@
     <ProjectReference Include="..\ControlPlane.Kafka\ControlPlane.Kafka.csproj" />
     <ProjectReference Include="..\ControlPlane.DevOps\ControlPlane.DevOps.csproj" />
     <ProjectReference Include="..\ControlPlane.ServiceBus\ControlPlane.ServiceBus.csproj" />
+    <ProjectReference Include="..\ControlPlane.HttpEndpoint\ControlPlane.HttpEndpoint.csproj" />
     <ProjectReference Include="..\ControlPlane.CopilotAgent\ControlPlane.CopilotAgent.csproj" />
     <ProjectReference Include="..\ControlPlane.ServiceDefaults\ControlPlane.ServiceDefaults.csproj" />
   </ItemGroup>

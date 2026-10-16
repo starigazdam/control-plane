@@ -1,0 +1,38 @@
+# HTTP Endpoint Plugin — runnable .http examples
+#
+# Prerequisites:
+#   1. Control Plane API running locally (default: http://localhost:5149)
+#   2. HttpEndpoint__ConfigPath points at a JSON file with endpoint definitions. An
+#      empty value disables the plugin. The endpoint ID referenced below is an
+#      example only; replace it with an ID from your local configuration file.
+#
+# Secrets: never commit real endpoint URLs or credentials here. Endpoint URLs live in
+# the configuration file, which is deployment-specific and not committed.
+# HOST/PROJECT_ID come from .env by default via {{$dotenv ...}}; override them in
+# your local .env.local (gitignored) instead of editing this file.
+
+@HOST = {{$dotenv HOST}}
+@PROJECT_ID = {{$dotenv PROJECT_ID}}
+
+###
+# Manually check one configured endpoint by ID. The caller cannot supply a URL,
+# headers, or a body; only a configured endpoint ID is accepted.
+# RequiresConfirmation=false — read-only, at most one request per check.
+
+POST {{HOST}}/api/operations/execute
+Content-Type: application/json
+
+{
+  "projectId": "{{PROJECT_ID}}",
+  "operationId": "http-endpoint-check",
+  "requestedBy": "engineer@example.com",
+  "input": {
+    "endpointId": "example-health"
+  }
+}
+
+###
+# Retrieve the last 20 operation executions (includes HTTP Endpoint history).
+
+GET {{HOST}}/api/operations/history?take=20
+Accept: application/json

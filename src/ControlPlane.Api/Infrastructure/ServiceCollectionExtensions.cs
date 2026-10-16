@@ -4,6 +4,7 @@ using ControlPlane.Core.Interfaces;
 using ControlPlane.Core.Plugins;
 using ControlPlane.CopilotAgent;
 using ControlPlane.DevOps;
+using ControlPlane.HttpEndpoint;
 using ControlPlane.Kafka;
 using ControlPlane.ServiceBus;
 using Microsoft.Extensions.Configuration;
@@ -24,6 +25,41 @@ public static class ServiceCollectionExtensions
         services.Configure<KafkaSettings>(configuration.GetSection(KafkaSettings.SectionName));
         services.Configure<DevOpsSettings>(configuration.GetSection(DevOpsSettings.SectionName));
         services.Configure<CopilotAgentSettings>(configuration.GetSection(CopilotAgentSettings.SectionName));
+        services.Configure<HttpEndpointSettings>(configuration.GetSection(HttpEndpointSettings.SectionName));
+
+        // ── HTTP endpoint plugin client ──────────────────────────────────────
+        // One dedicated client for endpoint checks. Override the shared
+        // ServiceDefaults defaults: no resilience (retries, circuit breaker, or a
+        // second timeout layer), no service-discovery resolution, no automatic
+        // redirects, no framework request logs, and no URL-bearing spans. The
+        // per-entry timeout is applied by the checker.
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental but is the supported opt-out.
+        var httpEndpointClient = services
+            .AddHttpClient(HttpEndpointChecker.HttpClientName)
+            .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+
+        httpEndpointClient
+            .RemoveAllLoggers()
+            .ConfigureHttpClient(static client => client.Timeout = Timeout.InfiniteTimeSpan)
+            .ConfigureAdditionalHttpMessageHandlers(static (handlers, _) =>
+            {
+                for (var index = handlers.Count - 1; index >= 0; index--)
+                {
+                    if (string.Equals(
+                            handlers[index].GetType().FullName,
+                            "Microsoft.Extensions.ServiceDiscovery.Http.ResolvingHttpDelegatingHandler",
+                            StringComparison.Ordinal))
+                    {
+                        handlers.RemoveAt(index);
+                    }
+                }
+            })
+            .ConfigurePrimaryHttpMessageHandler(static () => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                UseCookies = false
+            });
 
         // ── Plugin discovery ─────────────────────────────────────────────────
         var pluginTypes = assemblies

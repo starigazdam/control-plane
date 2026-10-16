@@ -7,6 +7,7 @@ using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using System.Net.Http;
 
 namespace Microsoft.Extensions.Hosting;
 
@@ -17,6 +18,21 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
+
+    /// <summary>
+    /// Returns <see langword="false"/> for the HTTP endpoint check client's requests so
+    /// no URL-derived span or attribute is exported for a configured endpoint URL. The
+    /// marker value mirrors <c>ControlPlane.HttpEndpoint.HttpEndpointChecker.RequestMarkerOptionKey</c>.
+    /// </summary>
+    public static bool ShouldCollectHttpClientTrace(HttpRequestMessage request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return !(request.Options.TryGetValue(
+                     new HttpRequestOptionsKey<bool>("ControlPlane.HttpEndpoint.Check"),
+                     out var isEndpointCheck)
+                 && isEndpointCheck);
+    }
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
@@ -70,7 +86,13 @@ public static class Extensions
                     )
                     // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
                     //.AddGrpcClientInstrumentation()
-                    .AddHttpClientInstrumentation();
+                    .AddHttpClientInstrumentation(options =>
+                    {
+                        // Suppress all URL-derived trace data for the HTTP endpoint check
+                        // client. The marker value mirrors
+                        // ControlPlane.HttpEndpoint.HttpEndpointChecker.RequestMarkerOptionKey.
+                        options.FilterHttpRequestMessage = static request => ShouldCollectHttpClientTrace(request);
+                    });
             });
 
         builder.AddOpenTelemetryExporters();

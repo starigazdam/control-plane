@@ -1,0 +1,53 @@
+using System.Net;
+using System.Net.Sockets;
+namespace ControlPlane.AppHost.Tests;
+/// <summary>Minimal loopback HTTP server so the Aspire-backed test never contacts a live endpoint.</summary>
+internal sealed class LoopbackHttpServer : IDisposable
+{
+    private readonly TcpListener _listener;
+    private readonly CancellationTokenSource _cancellation = new();
+    public LoopbackHttpServer()
+    {
+        var port = GetFreePort();
+        Url = $"http://localhost:{port}/health?probe=r2";
+        _listener = new TcpListener(IPAddress.Loopback, port);
+        _listener.Start();
+        _ = Task.Run(PumpAsync);
+    }
+    public string Url { get; }
+    private async Task PumpAsync()
+    {
+        while (!_cancellation.IsCancellationRequested)
+        {
+            TcpClient client;
+            try { client = await _listener.AcceptTcpClientAsync(_cancellation.Token); }
+            catch (Exception) { return; }
+            _ = Task.Run(async () =>
+            {
+                using (client)
+                {
+                    try
+                    {
+                        await client.GetStream().ReadAtLeastAsync(new byte[1024], 1, throwOnEndOfStream: false, _cancellation.Token);
+                        await client.GetStream().WriteAsync("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"u8.ToArray(), _cancellation.Token);
+                    }
+                    catch (Exception) { }
+                }
+            });
+        }
+    }
+    private static int GetFreePort()
+    {
+        var probe = new TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        return port;
+    }
+    public void Dispose()
+    {
+        _cancellation.Cancel();
+        try { _listener.Stop(); } catch (ObjectDisposedException) { }
+        _cancellation.Dispose();
+    }
+}

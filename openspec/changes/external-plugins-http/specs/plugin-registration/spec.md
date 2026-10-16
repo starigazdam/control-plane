@@ -7,12 +7,14 @@
 Plugins SHALL register status providers and operations through
 `IPluginRegistration`. The contract SHALL support type, instance, and factory
 registration: `AddStatusProvider<TStatusProvider>` and
-`AddOperation<TOperation>` for types, plus an instance overload and a factory
-overload for each capability kind. The concrete `PluginRegistration` SHALL
-collect a descriptor for each registration so one plugin can register many
-status providers and many operations. The host SHALL record a repeated type
-registration once, and SHALL record each instance registration and each factory
-registration separately.
+`AddOperation<TOperation>` for types, an instance overload
+`AddStatusProvider(IStatusProvider)` or `AddOperation(IOperation)`, and a
+factory overload `AddStatusProvider(Func<IServiceProvider, IStatusProvider>)` or
+`AddOperation(Func<IServiceProvider, IOperation>)`. The concrete
+`PluginRegistration` SHALL collect a descriptor for each registration so one
+plugin can register many status providers and many operations. The host SHALL
+record a repeated type registration once, and SHALL record each instance
+registration and each factory registration separately.
 
 #### Scenario: Plugin registers a status provider and an operation
 - **WHEN** a plugin calls `AddStatusProvider<TStatusProvider>` and `AddOperation<TOperation>`
@@ -31,9 +33,11 @@ registration separately.
 The host SHALL register each collected descriptor as its capability contract. A
 type descriptor SHALL register as a transient `IStatusProvider` or a transient
 `IOperation`. An instance descriptor SHALL register its instance as a singleton.
-A factory descriptor SHALL register a singleton created from its factory. The
-host SHALL also record a `DiscoveredPluginCatalog` that holds the recorded
-plugin names and the capability descriptors instead of type lists.
+A factory descriptor SHALL register a singleton created by invoking its factory
+with the `IServiceProvider`, so a factory can resolve services such as
+`IHttpClientFactory`. The host SHALL also record a `DiscoveredPluginCatalog`
+that holds the recorded plugin names and the capability descriptors instead of
+type lists.
 
 #### Scenario: Collected types become container registrations
 - **WHEN** plugins have registered status providers and operations as types

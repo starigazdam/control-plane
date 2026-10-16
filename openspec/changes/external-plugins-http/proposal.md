@@ -23,23 +23,35 @@ keeps the existing plugin model.
 - Fetch `GET /capabilities` once per plugin during registration, synchronously,
   with a 10-second timeout. Expose the wire endpoints `GET /capabilities`,
   `GET /status/{id}?projectId={projectId}`, `POST /operations/{id}/validate`,
-  and `POST /operations/{id}/execute`.
+  and `POST /operations/{id}/execute`. The startup fetch runs before the
+  container exists, so it uses one short-lived `HttpClient`; runtime remote
+  calls use `IHttpClientFactory`.
 - Use the plugin `name` as a namespace. Expose operations and status providers
-  as `{name}.{remoteId}`. Fail startup on a duplicate or invalid name. Exclude a
-  remote id that violates the id grammar and report it as a `Warning` signal.
+  as `{name}.{remoteId}`. Fail startup on a duplicate or invalid name. Register
+  one status provider `{name}.bridge` for every configured plugin. Exclude a
+  remote id that violates the id grammar, the reserved status provider id
+  `bridge`, and every entry of a duplicate id group, and report each exclusion
+  as a `Warning` on `{name}.bridge`.
 - Keep the host available when a plugin is unreachable, returns a non-2xx
-  response, or returns malformed capabilities at startup. Register one status
-  provider `{name}.bridge` that reports `Warning`, register no operations for
-  that plugin, and still start.
+  response, or returns invalid capabilities at startup. The `{name}.bridge`
+  provider reports `Healthy` when discovery succeeds with no exclusions, and
+  `Warning` with `unreachable`, `invalid capabilities`, or the excluded
+  capabilities otherwise. Register no operations for a failed plugin and still
+  start.
 - Bound every call at a fixed 10-second timeout with no retry. Map a failed
-  operation call to an `OperationExecutionResult` with `Failed` and a stable
-  `ErrorCode`, recorded through the existing execution history path. Map a
-  failed status call to a `Warning` snapshot.
+  execute call to an `OperationExecutionResult` with `Failed` and a stable
+  bridge code, recorded through the existing execution history path. Pass a
+  well-formed remote execute result through unchanged. Return a stable bridge
+  code from `ValidateAsync` when a remote validate call fails, so the workbench
+  rejects with `operation_validation_failed` and does not execute. Map a failed
+  status call to a `Warning` snapshot.
 - Change `IPluginRegistration` to support instance and factory registration so
-  one plugin can register many remote status providers and operations. Change
-  `DiscoveredPluginCatalog` from `Type` lists to descriptors. The project is
-  new, so there is no backward-compatibility requirement; update built-in
-  plugins as needed.
+  one plugin can register many remote status providers and operations. Factory
+  overloads take `Func<IServiceProvider, IStatusProvider>` and
+  `Func<IServiceProvider, IOperation>` and register as singletons, so a bridge
+  can resolve `IHttpClientFactory`. Change `DiscoveredPluginCatalog` from `Type`
+  lists to descriptors. The project is new, so there is no
+  backward-compatibility requirement; update built-in plugins as needed.
 - Map remote `requiresConfirmation` to `OperationDefinition.RequiresConfirmation`
   as metadata only, exactly like the built-ins.
 - Do not forward actor identity, a correlation id, or credentials in this

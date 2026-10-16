@@ -157,9 +157,10 @@ rejected because it adds complexity without a first-slice need.
 ### Add one bridge plugin project
 
 One bridge plugin project, `ControlPlane.ExternalPlugins`, hosts the bridge. It
-reads configuration, fetches capabilities, and creates one bridge status
-provider or operation per remote capability. Adapters for custom consumer APIs
-live in the consumer's process, never in this repository.
+reads configuration, fetches capabilities, and creates one status provider
+`{name}.bridge` per plugin plus one bridge status provider or operation per
+remote capability. Adapters for custom consumer APIs live in the consumer's
+process, never in this repository.
 
 Alternatives considered: a separate bridge assembly per remote plugin was
 rejected because it multiplies projects without adding a boundary. Letting the
@@ -170,17 +171,20 @@ concerns in the host and `ControlPlaneWorkbenchService`.
 
 `IPluginRegistration` gains an instance overload and a factory overload for each
 capability kind: `AddStatusProvider(IStatusProvider)`,
-`AddStatusProvider(Func<IStatusProvider>)`, `AddOperation(IOperation)`, and
-`AddOperation(Func<IOperation>)`. `PluginRegistration` collects a descriptor for
-each registration instead of a `Type` set. Type descriptors keep the current
-deduplication by type. Instance and factory descriptors are recorded separately,
-so one plugin can register N remote capabilities.
+`AddStatusProvider(Func<IServiceProvider, IStatusProvider>)`,
+`AddOperation(IOperation)`, and
+`AddOperation(Func<IServiceProvider, IOperation>)`. `PluginRegistration` collects
+a descriptor for each registration instead of a `Type` set. Type descriptors
+keep the current deduplication by type. Instance and factory descriptors are
+recorded separately, so one plugin can register N remote capabilities.
 
 `DiscoveredPluginCatalog` changes from `Type` lists to descriptor lists. The
 host registers a type descriptor as a transient `IStatusProvider` or
 `IOperation`, an instance descriptor as a singleton, and a factory descriptor
-as a singleton created from its factory. Built-in plugins are updated only as
-the changed contract requires. There is no backward-compatibility requirement
+as a singleton created by invoking its factory with the `IServiceProvider`. The
+factory receives the service provider so a bridge can resolve
+`IHttpClientFactory` at runtime. Built-in plugins are updated only as the
+changed contract requires. There is no backward-compatibility requirement
 because the project is new.
 
 Alternatives considered: keeping `Type`-only registration and constructing each
@@ -192,10 +196,15 @@ custom constructor was rejected for the same reason.
 ### Fetch capabilities once at startup
 
 The bridge fetches `GET /capabilities` once per plugin during registration,
-synchronously, each call bounded by a 10-second timeout. Successful discovery
-creates the namespaced bridges. Failure discovery registers one status provider
-`{name}.bridge` that reports `Warning`, registers no operations, and lets the
-host start.
+synchronously, each call bounded by a 10-second timeout. The startup fetch runs
+before the service container exists, so it uses one short-lived `HttpClient`;
+remote calls at runtime use `IHttpClientFactory`. The host always registers one
+status provider `{name}.bridge` per configured plugin. That provider reports
+`Healthy` when discovery succeeds with no exclusions. It reports `Warning` when
+the plugin is unreachable, when the response is invalid capabilities, or when
+one or more capabilities are excluded; an exclusion warning lists the excluded
+capabilities. Failure discovery registers no operations for that plugin and
+lets the host start.
 
 Alternatives considered: lazy discovery on first use was rejected because it
 moves a network call onto the request path and makes operations appear and
@@ -208,8 +217,18 @@ A plugin `name` is 1-32 lowercase ASCII letters, digits, or hyphens, starting
 with a letter. The name is the namespace, so the host exposes
 `{name}.{remoteId}` for each operation and status provider. A duplicate name
 fails startup. An invalid name fails startup. A remote id must be 1-64 ASCII
-letters, digits, dots, underscores, or hyphens; any capability that violates
-that grammar is excluded and reported as a `Warning` signal.
+letters, digits, dots, underscores, or hyphens. The status provider id `bridge`
+is reserved because it collides with `{name}.bridge`. The host excludes a
+capability that violates the grammar or uses the reserved id, and excludes every
+entry in a duplicate id group when two status provider ids, or two operation
+ids, are equal. The comparison is case-sensitive. Each exclusion is reported as
+a `Warning` on `{name}.bridge`.
+
+The capabilities body must be JSON with a top-level object that contains a
+`statusProviderIds` array and an `operations` array; otherwise the host treats
+the response as invalid capabilities. An operation entry that omits a required
+field or supplies a wrongly typed required field is excluded with a `Warning` on
+`{name}.bridge`, and the remaining capabilities still register.
 
 Alternatives considered: case-insensitive or unvalidated names were rejected
 because ids must be stable and predictable. Allowing arbitrary remote ids was
@@ -217,18 +236,27 @@ rejected because an exposed id must compose with the host's existing lookup.
 
 ### Bound calls and map failures to stable results
 
-Each call to an external plugin uses a fixed 10-second timeout with no retry. A
-remote operation call that times out, fails at the transport layer, returns a
-non-2xx response, or returns a malformed response produces an
-`OperationExecutionResult` with status `Failed` and a stable error code. The
-host records that result through the existing execution history path. A failed
-remote status call produces a `Warning` snapshot.
+Each call to an external plugin uses a fixed 10-second timeout with no retry.
+Runtime remote calls resolve `IHttpClientFactory` from the container. A remote
+execute call that times out, fails at the transport layer, returns a non-2xx
+response, or returns a malformed response produces an `OperationExecutionResult`
+with status `Failed` and a stable error code. The host records that result
+through the existing execution history path. A well-formed remote execute result
+passes its `status`, `message`, `errorCode`, and `output` through unchanged. A
+failed remote status call produces a `Warning` snapshot.
+
+A remote validate call that fails the same way returns one error string from
+`ValidateAsync` instead. The string contains a stable bridge code, so the
+workbench rejects the execution with `operation_validation_failed` and does not
+call execute.
 
 Stable error codes are `external_operation_timeout`,
 `external_operation_transport_failed`, `external_operation_unexpected_status`,
 and `external_operation_invalid_response`. These are local codes that the bridge
-produces when the remote call fails; a remote plugin's own error code is not
-trusted as a host code.
+produces when the bridge side fails. A remote plugin's own error code is passed
+through for a well-formed response and is not trusted as a host code. A remote
+`status` value outside `Succeeded`, `Failed`, or `Rejected` is a malformed
+response and maps to `external_operation_invalid_response`.
 
 Alternatives considered: retrying a failed call was rejected because the first
 slice must keep side effects bounded and the maintainer settled on no retry.
@@ -255,8 +283,8 @@ Adding a plugin-specific authentication scheme was rejected for the same reason.
 
 The end-to-end tests start a fabricated external plugin as a separate Kestrel
 process. The tests cover observe through act through the bridge, an unreachable
-plugin, a duplicate name, and a call timeout. The tests make no live external
-calls. The change also adds `.http` examples for the bridge and the fixture
+plugin, a duplicate name, a capacity exclusion, a call timeout, and a validate
+failure. The tests make no live external calls. The change also adds `.http` examples for the bridge and the fixture
 plugin and a short authoring guide in `docs/`.
 
 Alternatives considered: a mocked `HttpMessageHandler` alone was rejected
@@ -284,7 +312,7 @@ process, or startup discovery. It is still useful for focused unit tests.
 - **No retry:** a transient remote failure fails the operation. This is
   intentional for the first slice; a caller can retry the operation.
 - **Excluded remote ids:** excluding an invalid remote id hides a plugin
-  capability. The `Warning` signal makes the exclusion visible.
+  capability. The `Warning` on `{name}.bridge` makes the exclusion visible.
 - **No version negotiation:** a plugin and the host share one contract version.
   A future contract change needs a versioning decision.
 - **Test fixture drift:** the fixture plugin can drift from the OpenAPI

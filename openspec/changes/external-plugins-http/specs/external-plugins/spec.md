@@ -45,6 +45,18 @@ provider ids and the remote operation definitions.
 - **WHEN** a capabilities call does not complete within 10 seconds
 - **THEN** the host treats that plugin as unreachable and continues startup
 
+### Requirement: Validate the capabilities response shape
+
+The response SHALL be JSON whose top-level shape is an object with a
+`statusProviderIds` array and an `operations` array. A response that is not JSON
+or whose top-level shape omits either array SHALL be invalid capabilities. An
+operation entry that omits a required field or supplies a wrongly typed required
+field SHALL be excluded and reported as a `Warning` signal on `{name}.bridge`.
+
+#### Scenario: Operation entry is missing a required field
+- **WHEN** a capabilities response contains an operation entry with a missing or wrongly typed required field
+- **THEN** the host excludes that entry, reports a `Warning` signal on `{name}.bridge`, and registers the remaining capabilities
+
 ### Requirement: Namespace external capabilities by plugin name
 
 A configured `name` SHALL be 1-32 lowercase ASCII letters, digits, or hyphens,
@@ -69,12 +81,32 @@ match the grammar.
 ### Requirement: Exclude remote ids that are not valid
 
 A remote id SHALL be 1-64 ASCII letters, digits, dots, underscores, or hyphens.
-The host SHALL exclude a capability whose remote id does not match that grammar.
-The host SHALL report each excluded capability as a `Warning` signal.
+The status provider id `bridge` SHALL be reserved. The host SHALL exclude a
+status provider whose remote id is `bridge`, and a capability whose remote id
+does not match the grammar. The host SHALL report each exclusion as a `Warning`
+signal on `{name}.bridge`.
 
 #### Scenario: Capabilities contain an invalid remote id
 - **WHEN** a capabilities response lists a capability whose remote id does not match the id grammar
-- **THEN** the host registers no capability for it and reports a `Warning` signal
+- **THEN** the host registers no capability for it and reports a `Warning` signal on `{name}.bridge`
+
+#### Scenario: Remote status provider id is reserved
+- **WHEN** a capabilities response lists a status provider whose remote id is `bridge`
+- **THEN** the host registers no status provider for it and reports a `Warning` signal on `{name}.bridge`
+
+### Requirement: Exclude duplicate remote ids
+
+The host SHALL exclude every entry in a duplicate group when two status provider
+ids, or two operation ids, are equal. The comparison SHALL be case-sensitive.
+The host SHALL report each exclusion as a `Warning` signal on `{name}.bridge`.
+
+#### Scenario: Status provider ids duplicate
+- **WHEN** a capabilities response lists two status provider ids that are equal
+- **THEN** the host excludes every entry in that duplicate group and reports a `Warning` signal on `{name}.bridge`
+
+#### Scenario: Operation ids duplicate
+- **WHEN** a capabilities response lists two operation ids that are equal
+- **THEN** the host excludes every entry in that duplicate group and reports a `Warning` signal on `{name}.bridge`
 
 ### Requirement: Normalize external capabilities to Core contracts
 
@@ -107,26 +139,38 @@ the change design.
 - **WHEN** a caller invokes a remote operation
 - **THEN** the bridge calls `POST /operations/{id}/validate` and `POST /operations/{id}/execute` with the defined payloads
 
-### Requirement: Keep the host available when a plugin is unreachable or invalid
+### Requirement: Register a bridge status provider for every plugin
 
-When a plugin is unreachable at startup, the host SHALL register one status
-provider `{name}.bridge` that reports `Warning` with the text `unreachable`. When
-a plugin returns a non-2xx response or malformed capabilities at startup, the
-host SHALL register one status provider `{name}.bridge` that reports `Warning`
-with the text `invalid capabilities`. In both cases the host SHALL register no
-operations for that plugin and SHALL still start.
+The host SHALL register exactly one status provider `{name}.bridge` for every
+configured plugin. The provider SHALL report `Healthy` when discovery succeeded
+with no excluded capability. The provider SHALL report `Warning` when the plugin
+is unreachable, when the plugin returns a non-2xx response or invalid
+capabilities, or when one or more capabilities were excluded.
+
+#### Scenario: Plugin discovery succeeds without exclusions
+- **WHEN** a configured plugin is reachable and returns no excluded capability
+- **THEN** the host registers `{name}.bridge` reporting `Healthy`
 
 #### Scenario: Plugin is unreachable at startup
 - **WHEN** a configured plugin is unreachable at startup
-- **THEN** the host registers `{name}.bridge` with a `Warning` reporting `unreachable` and starts
+- **THEN** the host registers `{name}.bridge` reporting `Warning` with `unreachable` and starts
 
 #### Scenario: Plugin returns invalid capabilities at startup
-- **WHEN** a configured plugin returns a non-2xx response or malformed capabilities at startup
-- **THEN** the host registers `{name}.bridge` with a `Warning` reporting `invalid capabilities` and starts
+- **WHEN** a configured plugin returns a non-2xx response or invalid capabilities at startup
+- **THEN** the host registers `{name}.bridge` reporting `Warning` with `invalid capabilities` and starts
 
-#### Scenario: Unreachable plugin contributes no operations
-- **WHEN** a plugin is unreachable or invalid at startup
-- **THEN** the host registers no operations for that plugin
+#### Scenario: Plugin capabilities are excluded
+- **WHEN** one or more capabilities of a reachable plugin are excluded
+- **THEN** the host keeps the remaining capabilities and registers `{name}.bridge` reporting `Warning` that lists the excluded capabilities
+
+### Requirement: Keep the host available when discovery fails
+
+When discovery fails for a plugin, the host SHALL register no operations for
+that plugin and SHALL still start.
+
+#### Scenario: Failed plugin contributes no operations
+- **WHEN** a plugin is unreachable or returns invalid capabilities at startup
+- **THEN** the host registers no operations for that plugin and still starts
 
 ### Requirement: Bound every external call
 
@@ -139,19 +183,51 @@ plugin. The bridge SHALL NOT retry a failed call.
 
 ### Requirement: Map remote failures to stable results
 
-A remote operation call that times out, fails at the transport layer, returns a
+A remote execute call that times out, fails at the transport layer, returns a
 non-2xx response, or returns a malformed response SHALL produce an
-`OperationExecutionResult` with status `Failed` and a stable `ErrorCode`. The
-host SHALL record that result through the existing execution history path. A
-failed remote status call SHALL produce a `Warning` snapshot.
+`OperationExecutionResult` with status `Failed` and a stable bridge code. A
+well-formed remote execute response SHALL pass its `status`, `message`,
+`errorCode`, and `output` through unchanged. The host SHALL record the result
+through the existing execution history path. A failed remote status call SHALL
+produce a `Warning` snapshot.
 
-#### Scenario: Remote operation call fails
-- **WHEN** a remote operation call times out, fails at the transport layer, returns a non-2xx response, or returns a malformed response
-- **THEN** the bridge returns a `Failed` result with a stable `ErrorCode` and the host records it in execution history
+#### Scenario: Remote execute call fails at the bridge
+- **WHEN** a remote execute call times out, fails at the transport layer, returns a non-2xx response, or returns a malformed response
+- **THEN** the bridge returns a `Failed` result with a stable bridge code and the host records it in execution history
+
+#### Scenario: Remote execute response is well formed
+- **WHEN** a remote execute response is well formed
+- **THEN** the bridge passes the remote `status`, `message`, `errorCode`, and `output` through unchanged
 
 #### Scenario: Remote status call fails
 - **WHEN** a remote status call fails
 - **THEN** the bridge returns a `Warning` snapshot
+
+### Requirement: Use stable bridge error codes
+
+A bridge-side failure SHALL use one of the stable bridge codes
+`external_operation_timeout`, `external_operation_transport_failed`,
+`external_operation_unexpected_status`, or
+`external_operation_invalid_response`. A bridge code SHALL be produced only for
+a bridge-side failure. A remote `status` value outside `Succeeded`, `Failed`, or
+`Rejected` SHALL be a malformed response and SHALL map to
+`external_operation_invalid_response`.
+
+#### Scenario: Remote execute status is not recognized
+- **WHEN** a remote execute response carries a `status` value outside `Succeeded`, `Failed`, or `Rejected`
+- **THEN** the bridge returns a `Failed` result with `external_operation_invalid_response`
+
+### Requirement: Reject a remote operation when the validate call fails
+
+When a remote validate call times out, fails at the transport layer, returns a
+non-2xx response, or returns a malformed body, the bridge `ValidateAsync` SHALL
+return one error string that contains a stable bridge code. The workbench SHALL
+reject the execution with `operation_validation_failed` and SHALL NOT call the
+remote execute.
+
+#### Scenario: Remote validate call fails
+- **WHEN** a remote validate call times out, fails at the transport layer, returns a non-2xx response, or returns a malformed body
+- **THEN** `ValidateAsync` returns one error string with a stable bridge code and the workbench rejects with `operation_validation_failed` without calling execute
 
 ### Requirement: Preserve remote confirmation as metadata only
 

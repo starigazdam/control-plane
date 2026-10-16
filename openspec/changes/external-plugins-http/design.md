@@ -65,8 +65,9 @@ plugin lifecycle.
 ### Define the wire contract as a direct mapping of the Core records
 
 Each configured plugin serves endpoints relative to its `baseUrl`. A configured
-`baseUrl` must be an absolute `http` or `https` URI; a missing or invalid value
-fails startup with a clear error that names the setting. The bridge resolves each
+`baseUrl` must be an absolute `http` or `https` URI with no query, fragment, or
+userinfo; a missing or invalid value fails startup with a clear error that names
+the setting. The bridge resolves each
 endpoint by appending its path to `baseUrl` with exactly one `/` separator,
 preserving any path in `baseUrl`. The bridge maps the payloads to the Core
 contracts in camelCase.
@@ -151,10 +152,9 @@ contracts in camelCase.
 
 The bridge sets `startedAtUtc` and `completedAtUtc` itself from its own call
 timing and ignores the remote timestamps. A well-formed execute response
-requires the string `status` and the string `message`; `errorCode` and `output`
-are optional. The `status` value must be one of `Succeeded`, `Failed`, or
-`Rejected`, and a remote `errorCode` that begins with `external_operation_` is
-treated as a malformed response.
+requires the string `status` with a value of `Succeeded`, `Failed`, or
+`Rejected` and the string `message`; `errorCode` must not begin with
+`external_operation_`, and `output` is optional. Any other response is invalid.
 
 `StatusLevel` and `OperationExecutionStatus` serialize as strings, matching the
 host's existing `JsonStringEnumConverter`. The implementation publishes this
@@ -174,11 +174,11 @@ remote capability. Adapters for custom consumer APIs live in the consumer's
 process, never in this repository.
 
 The bridge implements `IPluginServiceRegistration`. During `RegisterServices` it
-binds its section from the `IConfiguration` the host passes, calls
-`services.AddHttpClient()`, and keeps the configured plugin list for its
-`Register` call. The host passes the application `IConfiguration` to every
-`IPluginServiceRegistration`; the bridge no longer relies on a static or
-`BuildServiceProvider()` workaround.
+binds its section from the `IConfiguration` the host passes, registers a named
+`HttpClient` with `services.AddHttpClient("<name>")`, and keeps the configured
+plugin list for its `Register` call. The host passes the application
+`IConfiguration` to every `IPluginServiceRegistration`; the bridge no longer
+relies on a static or `BuildServiceProvider()` workaround.
 
 At archive, the baseline `plugin-registration` Purpose is amended to state that
 external out-of-process plugins are consumed through the assembly-supplied
@@ -244,7 +244,8 @@ with a letter. The name is the namespace, so the host exposes
 fails startup. An invalid name fails startup. A remote id must be 1-64 ASCII
 letters, digits, dots, underscores, or hyphens, and must start with a letter or
 digit. The status provider id `bridge` is reserved because it collides with
-`{name}.bridge`. The host excludes a capability that violates the grammar or
+`{name}.bridge`; that reserved-id comparison is ordinal case-insensitive. The
+host excludes a capability that violates the grammar or
 uses the reserved id, and excludes every entry in a duplicate id group when two
 status provider ids, or two operation ids, are equal. The comparison is ordinal
 case-insensitive, matching the workbench operation lookup. Each exclusion is
@@ -254,7 +255,13 @@ The host also fails startup when two registered operations, or two registered
 status providers, built-in or external, expose ids that are equal under ordinal
 case-insensitive comparison. This matches the workbench constructor, which
 builds its operation index with `StringComparer.OrdinalIgnoreCase` and would
-throw on a case-insensitive duplicate.
+throw on a case-insensitive duplicate. Because type and factory descriptors
+expose an id only on an instance, this host-wide check runs after the container
+is built: the host resolves `IEnumerable<IOperation>` and
+`IEnumerable<IStatusProvider>` in a scope before it accepts requests, and a
+failure stops startup. A plugin `name` equal to a built-in id prefix can collide
+with a built-in id, and a remote operation id or status provider id that
+otherwise looks valid can still fail startup for that reason.
 
 The capabilities body must be JSON with a top-level object that contains a
 `statusProviderIds` array and an `operations` array; otherwise the host treats
@@ -265,11 +272,15 @@ requires the string `name` and the string `type`; `displayName` defaults to
 `name`, `description` to empty, `isRequired` to `false`, and `defaultValue` to
 null. An operation with an invalid parameter entry is excluded with a `Warning`
 on `{name}.bridge`; a non-string `statusProviderIds` element is excluded with a
-`Warning`. The remaining capabilities still register.
+`Warning`. An optional field with the wrong type, such as a non-boolean
+`requiresConfirmation` or a non-array `parameters`, and an `operations` element
+that is not an object, each exclude that operation with a `Warning` on
+`{name}.bridge`. The remaining capabilities still register.
 
-Alternatives considered: case-insensitive or unvalidated names were rejected
-because ids must be stable and predictable. Allowing arbitrary remote ids was
-rejected because an exposed id must compose with the host's existing lookup.
+Alternatives considered: case-insensitive or unvalidated plugin names were
+rejected because ids must be stable and predictable. Allowing arbitrary remote
+ids was rejected because an exposed id must compose with the host's existing
+lookup.
 
 ### Bound calls and map failures to stable results
 
@@ -298,12 +309,16 @@ and `output` through unchanged, and the bridge sets `startedAtUtc` and
 A status call that fails produces a `Warning` snapshot instead of throwing. A
 status call fails when it times out, fails at the transport layer, returns a
 non-2xx response, or returns a body that does not deserialize to a
-`StatusSnapshot` with known `StatusLevel` values. Every returned snapshot gets
+`StatusSnapshot` with known `StatusLevel` values. The `Warning` snapshot carries
+the fixed signal id `status-call-failed`. Every returned snapshot gets
 `providerId` `{name}.{remoteId}` and `projectId` set to the requested project id.
+`GetStatusAsync` propagates caller cancellation and does not treat it as a failed
+status call.
 
 A remote validate call that fails returns one error string from `ValidateAsync`
 instead, with the format `"<code>: <detail>"`, so the workbench rejects the
-execution with `operation_validation_failed` and does not call execute.
+execution with `operation_validation_failed` and does not call execute. It uses
+the same condition-to-code mapping as execute.
 
 Alternatives considered: retrying a failed call was rejected because the first
 slice must keep side effects bounded and the maintainer settled on no retry.
@@ -319,12 +334,16 @@ identity, a correlation id, or credentials, and it does not authenticate an
 external call.
 
 Operators must run external plugins on a trusted network only until #57. The
-bridge disables trace-context propagation on its `HttpClient` (for example by
-setting `ActivityHeadersPropagator` to a no-output propagator), so an external
-request carries no actor identity, credentials, `traceparent`, `tracestate`, or
-other correlation header. Without that setting the .NET `HttpClient` pipeline
-would inject W3C `traceparent` and `tracestate` whenever an ambient `Activity`
-exists, and ASP.NET Core creates one per request.
+bridge disables trace-context propagation on its named bridge `HttpClient`,
+registered with `AddHttpClient("<name>")`, by configuring the primary handler
+with `ConfigurePrimaryHttpMessageHandler` and setting
+`SocketsHttpHandler.ActivityHeadersPropagator` to a no-output propagator. It
+applies the same setting to the short-lived startup client. Built-in plugins are
+not affected. An external request therefore carries no actor identity,
+credentials, `traceparent`, `tracestate`, or other correlation header. Without
+that setting the .NET `HttpClient` pipeline would inject W3C `traceparent` and
+`tracestate` whenever an ambient `Activity` exists, and ASP.NET Core creates one
+per request.
 
 Alternatives considered: forwarding the initiator or correlation id was rejected
 because #57 owns the identity contract and the first slice must not invent one.
@@ -369,6 +388,9 @@ process, or startup discovery. It is still useful for focused unit tests.
 - **Unknown remote outcome on timeout:** `external_operation_timeout` means the
   remote outcome is unknown. The remote may complete its side effect after the
   bridge timeout while execution history records `Failed`.
+- **Cancelled execute:** a cancelled execute propagates
+  `OperationCanceledException` and writes no history row, even if the remote side
+  effect ran.
 - **Response size:** the slice sets no cap on a remote response body.
   Response-size limits are deferred to #57.
 - **Excluded remote ids:** excluding an invalid remote id hides a plugin

@@ -7,7 +7,9 @@
 The host SHALL fail startup with a clear error when two registered operations, or
 two registered status providers, expose ids that are equal under ordinal
 case-insensitive comparison. The check SHALL cover built-in and external
-capabilities together.
+capabilities together. The check SHALL run after the container is built, by
+resolving `IEnumerable<IOperation>` and `IEnumerable<IStatusProvider>` in a scope
+before the host accepts requests, and a failure SHALL stop startup.
 
 #### Scenario: Two registered operations share an id
 - **WHEN** two registered operations, built-in or external, expose ids that are equal under ordinal case-insensitive comparison

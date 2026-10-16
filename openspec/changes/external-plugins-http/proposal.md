@@ -18,7 +18,8 @@ keeps the existing plugin model.
   the wire contract to `IStatusProvider` and `IOperation`. Adapters for custom
   consumer APIs stay in the consumer's process, never in this repository.
 - Read a static configuration list of plugin entries, each with a `name` and a
-  `baseUrl`. Require `baseUrl` to be an absolute `http` or `https` URI; fail
+  `baseUrl`. Require `baseUrl` to be an absolute `http` or `https` URI with no
+  query, fragment, or userinfo; fail
   startup with a clear error that names the setting when `baseUrl` is missing or
   invalid. Load the plugin set at startup only. A restart applies changes. Do not
   add hot reload.
@@ -34,10 +35,13 @@ keeps the existing plugin model.
   built-in or external, expose ids equal under ordinal case-insensitive
   comparison. Register one status provider `{name}.bridge` for every configured
   plugin. Exclude a remote id that violates the id grammar, the reserved status
-  provider id `bridge`, every entry of a duplicate id group (ordinal
+  provider id `bridge` (ordinal case-insensitive), every entry of a duplicate id
+  group (ordinal
   case-insensitive), a non-string `statusProviderIds` element, and an operation
-  entry that omits its required string `id` or `displayName` or carries an invalid
-  parameter entry, and report each exclusion as a `Warning` on `{name}.bridge`.
+  entry that omits its required string `id` or `displayName`, carries an invalid
+  parameter entry, or carries a wrongly typed optional field, and an `operations`
+  element that is not an object, and report each exclusion as a `Warning` on
+  `{name}.bridge`.
 - Keep the host available when a plugin is unreachable, returns a non-2xx
   response, or returns invalid capabilities at startup. The `{name}.bridge`
   provider reports `Healthy` when discovery succeeds with no exclusions, and
@@ -68,16 +72,19 @@ keeps the existing plugin model.
   lists to descriptors. Change `IPluginServiceRegistration.RegisterServices` to
   `RegisterServices(IServiceCollection services, IConfiguration configuration)`
   with no backward-compatible overload, so the bridge binds its section during
-  registration, calls `services.AddHttpClient()`, and keeps its plugin list for
+  registration, registers a named client with `services.AddHttpClient("<name>")`,
+  and keeps its plugin list for
   its `Register` call. The project is new, so there is no backward-compatibility
   requirement; update built-in plugins as needed.
 - Map remote `requiresConfirmation` to `OperationDefinition.RequiresConfirmation`
   as metadata only, exactly like the built-ins.
 - Do not forward actor identity, a correlation id, or credentials in this
   slice, and add no authentication. Disable trace-context propagation on the
-  bridge `HttpClient`, so a request carries no `traceparent`, `tracestate`, or
-  other correlation header. Document that operators must run external plugins on
-  a trusted network until #57.
+  named bridge `HttpClient`, registered with `AddHttpClient("<name>")`, and on
+  the short-lived startup client, so a request carries no `traceparent`,
+  `tracestate`, or other correlation header; built-in plugins are not affected.
+  Document that operators must run external plugins on a trusted network until
+  #57.
 - Publish the wire contract as OpenAPI in `docs/` at implementation time. Add a
   fabricated fixture plugin that runs as a separate Kestrel process in tests,
   `.http` examples for the bridge and the fixture, and a short authoring guide.
@@ -94,7 +101,13 @@ keeps the existing plugin model.
 
 - `plugin-registration`: The registration contract supports instance and factory
   registration and records capability descriptors, so one plugin can expose many
-  remote status providers and operations.
+  remote status providers and operations. It changes
+  `IPluginServiceRegistration.RegisterServices` to the
+  `RegisterServices(IServiceCollection, IConfiguration)` signature with no
+  backward-compatible overload, and it adds a uniqueness requirement that fails
+  startup when two registered operations, or two registered status providers,
+  built-in or external, expose ids that are equal under ordinal case-insensitive
+  comparison.
 
 ## Impact
 

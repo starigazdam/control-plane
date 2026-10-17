@@ -26,7 +26,7 @@ A non-blank endpoint `cron` value SHALL override `HttpEndpoint__DefaultCron`. An
 
 ### Requirement: Define cron fields and operators
 
-Schedules SHALL use five numeric fields: minute `0-59`, hour `0-23`, day `1-31`, month `1-12`, and weekday `0-6` where Sunday is `0`. Each field value SHALL use only ASCII decimal digits `0-9`. Support `*`, comma-separated lists, and ascending ranges. Reject empty list items, names, aliases, seconds, years, macros, and descending ranges.
+Schedules SHALL use five numeric fields: minute `0-59`, hour `0-23`, day `1-31`, month `1-12`, and weekday `0-6` where Sunday is `0`. Each field value SHALL use only ASCII decimal digits `0-9`. Support `*`, comma-separated lists, and ascending ranges. `*` SHALL be valid only as the whole field or as the base of `*/step`. Reject empty list items, names, aliases, seconds, years, macros, descending ranges, and mixed forms such as `*,5` or `1,*`.
 
 #### Scenario: Parse supported fields
 - **WHEN** the expression is `*/15 9-17 * * 1-5`
@@ -40,37 +40,57 @@ Schedules SHALL use five numeric fields: minute `0-59`, hour `0-23`, day `1-31`,
 - **WHEN** a value carries a leading sign such as `+1` or `-1`, or uses a non-ASCII digit
 - **THEN** the system rejects that schedule
 
+#### Scenario: Reject misplaced wildcard
+- **WHEN** a list item combines `*` with another value, such as `*,5` or `1,*`
+- **THEN** the system rejects that schedule
+
 ### Requirement: Parse cron steps and values
 
-Steps SHALL be positive integers applied only to `*` or ascending ranges. A step SHALL not exceed the field's value count, or the range's value count when used on a range. Single-value steps SHALL be rejected. Leading zeros SHALL mean decimal values. Duplicate list values SHALL act as one value.
+Steps SHALL be positive integers applied only to `*` or ascending ranges. A step on `*` SHALL select the field's minimum, the minimum plus the step, and each following value through the field's maximum. A step on `a-b` SHALL select `a`, `a` plus the step, and each following value through `b`. A step SHALL not exceed the field's or range's value count. Single-value steps SHALL be rejected. Leading zeros SHALL mean decimal values. Duplicate list values SHALL count once.
 
 #### Scenario: Parse a valid range step
 - **WHEN** a range has a positive step no greater than its value count
 - **THEN** the system accepts the schedule
 
+#### Scenario: Step expansion starts at the field minimum
+- **WHEN** the day-of-month field is `*/2` or the weekday field is `*/2`
+- **THEN** day-of-month selects 1, 3, 5, ..., 31 and weekday selects 0, 2, 4, 6
+
 #### Scenario: Reject invalid steps
 - **WHEN** a step is zero, exceeds its allowed count, or follows a single value
 - **THEN** the system rejects the schedule
 
-### Requirement: Parse cron whitespace and value types
+### Requirement: Parse cron whitespace
 
-Trim outer ASCII spaces and separate fields with one or more ASCII spaces. Reject tabs and other whitespace. A missing, null, or blank endpoint `cron` value SHALL be treated as absent and SHALL be eligible to inherit the global default. A present endpoint `cron` value that is not a JSON string, including an object or an array, SHALL be invalid, SHALL NOT be treated as absent, and SHALL NOT inherit the global default.
+The parser SHALL trim outer ASCII spaces and separate fields with one or more ASCII spaces. It SHALL reject tabs and other whitespace.
 
 #### Scenario: Parse ASCII spaces
 - **WHEN** an expression has outer ASCII spaces or multiple ASCII spaces between fields
 - **THEN** the system accepts the schedule if its fields are valid
 
+#### Scenario: Reject unsupported whitespace
+- **WHEN** an expression contains a tab or other unsupported whitespace
+- **THEN** the system rejects that schedule
+
+### Requirement: Resolve cron value types
+
+A missing, null, or blank endpoint `cron` value SHALL be absent and eligible to inherit the global default. A present, non-null non-string value, including an empty object or array, SHALL be invalid and SHALL NOT inherit the global default. Where the provider would flatten an empty object or array to a blank-like value, the implementation SHALL inspect the raw JSON value kind.
+
 #### Scenario: Missing, null, or blank schedule
 - **WHEN** an endpoint `cron` value is missing, null, or blank and the global default is valid
 - **THEN** the endpoint inherits the global default
 
-#### Scenario: Reject unsupported whitespace or type
-- **WHEN** an expression contains a tab, or an endpoint `cron` value is a JSON object, array, number, or boolean
+#### Scenario: Reject non-string value
+- **WHEN** an endpoint `cron` value is a JSON object, array, number, or boolean
+- **THEN** the system rejects that endpoint's schedule and does not inherit the global default
+
+#### Scenario: Empty object or array is invalid
+- **WHEN** an endpoint `cron` value is an empty JSON object or array and the global default is valid
 - **THEN** the system rejects that endpoint's schedule and does not inherit the global default
 
 ### Requirement: Match cron day fields
 
-Each day field SHALL always contribute its selected value set; a plain `*` selects every value in its field. If day-of-month or weekday begins with `*` (as `*` or `*/step`), both fields SHALL match. If neither field begins with `*`, either field SHALL match.
+Each day field SHALL always contribute its selected value set; a plain `*` selects every value in its field, and each day field's selected values always filter candidate dates. If day-of-month or weekday begins with `*` (as `*` or `*/step`), both fields SHALL match. If neither field begins with `*`, either field SHALL match.
 
 #### Scenario: Both day fields are restricted
 - **WHEN** the expression is `0 9 1 * 1`
@@ -78,15 +98,15 @@ Each day field SHALL always contribute its selected value set; a plain `*` selec
 
 #### Scenario: Day-of-month step with unrestricted weekday
 - **WHEN** the expression is `0 0 */2 * *`
-- **THEN** it matches even calendar days only
+- **THEN** it matches only odd day-of-month values
 
 #### Scenario: Weekday step with unrestricted day-of-month
 - **WHEN** the expression is `0 0 * * */2`
-- **THEN** it matches only the weekday values selected by the step
+- **THEN** it selects Sunday, Tuesday, Thursday, and Saturday
 
 #### Scenario: Day-of-month step with a restricted weekday
 - **WHEN** the expression is `0 9 */2 * 1`
-- **THEN** it matches Monday only when its day-of-month is even
+- **THEN** it matches Mondays only when the day-of-month is odd
 
 ### Requirement: Reject schedules with no occurrence
 
@@ -134,7 +154,7 @@ An invalid endpoint schedule SHALL produce one safe `Warning` signal with code `
 
 ### Requirement: Start scheduled checks in UTC
 
-The scheduler SHALL run in the API process and interpret schedules in UTC. It SHALL register the first occurrence strictly after startup and SHALL NOT run an immediate startup check.
+The scheduler SHALL run in the API process and interpret schedules in UTC. It SHALL register the first occurrence strictly after startup, SHALL NOT run an immediate startup check, and SHALL never send catch-up requests on restart.
 
 #### Scenario: Scheduler starts
 - **WHEN** the API starts with one or more valid effective schedules
@@ -155,26 +175,27 @@ The scheduler SHALL load configuration once at startup. Configuration changes SH
 
 ### Requirement: Handle late and missed occurrences
 
-An instant equal to `now` SHALL count as due. When exactly one due instant is at or before `now`, no later due instant is at or before `now`, and the endpoint and shared capacity are available, the scheduler SHALL run exactly one check. When two or more due instants are at or before `now`, the scheduler SHALL skip all elapsed instants without sending a request. A due occurrence consumed while the endpoint or shared gate is busy SHALL be skipped and SHALL NOT be queued.
+An instant equal to `now` SHALL count as due. When exactly one due instant is at or before `now` and the endpoint is not busy and a shared request slot is available, the scheduler SHALL run exactly one check. When two or more due instants are at or before `now`, the scheduler SHALL skip all elapsed instants without sending a request. A due occurrence consumed while the endpoint is busy or no shared request slot is available SHALL be skipped and SHALL NOT be queued.
 
 #### Scenario: Scheduler wakes late for exactly one occurrence
-- **WHEN** exactly one due instant is at or before `now`, no later due instant is at or before `now`, and the endpoint and shared capacity are available
+- **WHEN** exactly one due instant is at or before `now` and the endpoint is not busy and a shared request slot is available
 - **THEN** the scheduler sends exactly one request for that instant
 
 #### Scenario: Due instant equals the current time
-- **WHEN** a due instant equals `now` and no later due instant is at or before `now`
-- **THEN** the scheduler treats it as due and sends exactly one request
+- **WHEN** a due instant equals `now`
+- **THEN** the scheduler treats it as due
+- **AND** it sends no request for that instant unless the endpoint is not busy and a shared request slot is available
 
 #### Scenario: Scheduler wakes after several occurrences
 - **WHEN** two or more due instants are at or before `now`
 - **THEN** the scheduler skips all elapsed instants, sends zero requests for them, and selects the next future instant
 
 #### Scenario: Restart after several elapsed occurrences
-- **WHEN** the API restarts after two or more due instants are at or before `now`
+- **WHEN** the API restarts with one or more due instants at or before `now`
 - **THEN** the scheduler sends zero catch-up requests and selects the next future instant
 
 #### Scenario: Endpoint or capacity is busy
-- **WHEN** exactly one due instant is at or before `now` and the endpoint or the shared request gate is busy
+- **WHEN** exactly one due instant is at or before `now` and the endpoint is busy or no shared request slot is available
 - **THEN** the scheduler consumes and skips that occurrence, sends zero requests, and does not queue it
 
 ### Requirement: Handle system clock changes
@@ -185,16 +206,20 @@ The scheduler SHALL use the API process's UTC wall clock. A forward clock jump S
 - **WHEN** the UTC clock moves backward after an occurrence was consumed
 - **THEN** the scheduler does not run that occurrence again
 
-### Requirement: Bound endpoint overlap and concurrency
+### Requirement: Bound endpoint overlap
 
-The system SHALL allow at most one active check for each endpoint across scheduled checks, overview scans, and manual operations. It SHALL acquire the per-endpoint gate before the shared request gate. Work that holds the endpoint gate or is waiting for it SHALL count as active for overlap. It SHALL cap active endpoint requests at 20 per API process. Scheduled checks SHALL skip, not wait or queue, when the endpoint or shared request gate is busy.
+The system SHALL allow at most one check for each endpoint to hold that endpoint's gate across scheduled checks, overview scans, and manual operations. It SHALL acquire the per-endpoint gate before the shared request gate. An endpoint is `endpoint busy` when a check holds or awaits its gate; scheduled checks SHALL skip when the endpoint is busy.
 
-#### Scenario: Scheduled endpoint is already active
-- **WHEN** any check for an endpoint is active, including work holding or waiting for that endpoint's gate, at its scheduled instant
+#### Scenario: Scheduled endpoint is busy
+- **WHEN** a check holds or awaits an endpoint's gate at that endpoint's scheduled instant
 - **THEN** the scheduler skips that occurrence
 
+### Requirement: Bound shared request concurrency
+
+An `active request` is a check that holds a shared request slot and counts toward the cap. The system SHALL cap active requests at 20 per API process. Scheduled checks SHALL skip, not wait or queue, when no shared request slot is available immediately.
+
 #### Scenario: Shared capacity is full
-- **WHEN** all 20 request slots are active at a scheduled instant
+- **WHEN** all 20 shared request slots are held at a scheduled instant
 - **THEN** the scheduler skips that occurrence without queuing it
 
 ### Requirement: Bound scheduled check time

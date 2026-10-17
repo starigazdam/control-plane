@@ -6,6 +6,7 @@ using ControlPlane.Api.Services;
 using ControlPlane.Azure;
 using ControlPlane.CopilotAgent;
 using ControlPlane.DevOps;
+using ControlPlane.ExternalPlugins;
 using ControlPlane.HttpEndpoint;
 using ControlPlane.Kafka;
 using ControlPlane.ServiceBus;
@@ -66,7 +67,8 @@ builder.Services.AddControlPlanePlugins(
     typeof(DevOpsPlugin).Assembly,
     typeof(ServiceBusPlugin).Assembly,
     typeof(HttpEndpointPlugin).Assembly,
-    typeof(CopilotAgentPlugin).Assembly);
+    typeof(CopilotAgentPlugin).Assembly,
+    typeof(ExternalPluginsPlugin).Assembly);
 builder.Services.AddDbContext<ControlPlaneDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("ControlPlane")
@@ -90,6 +92,11 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<ControlPlaneDbContext>();
     dbContext.Database.EnsureCreated();
 }
+
+// Fail startup when two registered operations, or two registered status providers,
+// expose ids that are equal under ordinal case-insensitive comparison. Runs after
+// the container is built but before the host accepts requests.
+app.ValidateUniqueCapabilityIds();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -87,29 +87,50 @@ public static class ServiceCollectionExtensions
             // before status providers and operations are wired up.
             if (plugin is IPluginServiceRegistration serviceRegistration)
             {
-                serviceRegistration.RegisterServices(services);
+                serviceRegistration.RegisterServices(services, configuration);
             }
 
             plugin.Register(registration);
         }
 
         // ── Status providers and operations ───────────────────────────────────
-        foreach (var providerType in registration.StatusProviderTypes)
+        foreach (var descriptor in registration.StatusProviders)
         {
-            services.AddTransient(typeof(IStatusProvider), providerType);
+            RegisterCapability(services, descriptor);
         }
 
-        foreach (var operationType in registration.OperationTypes)
+        foreach (var descriptor in registration.Operations)
         {
-            services.AddTransient(typeof(IOperation), operationType);
+            RegisterCapability(services, descriptor);
         }
 
         services.AddSingleton(
             new DiscoveredPluginCatalog(
                 pluginNames.AsReadOnly(),
-                registration.StatusProviderTypes,
-                registration.OperationTypes));
+                registration.StatusProviders,
+                registration.Operations));
 
         return services;
+    }
+
+    private static void RegisterCapability(IServiceCollection services, PluginCapabilityDescriptor descriptor)
+    {
+        if (descriptor.ImplementationType is { } implementationType)
+        {
+            services.AddTransient(descriptor.ContractType, implementationType);
+        }
+        else if (descriptor.Instance is { } instance)
+        {
+            services.AddSingleton(descriptor.ContractType, instance);
+        }
+        else if (descriptor.Factory is { } factory)
+        {
+            services.AddSingleton(descriptor.ContractType, serviceProvider => factory(serviceProvider));
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                $"Plugin capability descriptor for contract '{descriptor.ContractType.FullName}' is empty.");
+        }
     }
 }

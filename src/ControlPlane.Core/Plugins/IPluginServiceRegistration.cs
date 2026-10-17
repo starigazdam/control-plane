@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ControlPlane.Core.Plugins;
@@ -12,7 +13,9 @@ namespace ControlPlane.Core.Plugins;
 public interface IPluginServiceRegistration
 {
     /// <summary>
-    /// Called during application startup to register plugin-specific services.
+    /// Called during application startup to register plugin-specific services. The host
+    /// passes the application configuration so a plugin can bind its own section and
+    /// register named clients before <see cref="IControlPlanePlugin.Register"/> runs.
     /// </summary>
-    void RegisterServices(IServiceCollection services);
+    void RegisterServices(IServiceCollection services, IConfiguration configuration);
 }

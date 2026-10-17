@@ -10,6 +10,8 @@
   <Project Path="ControlPlane.ServiceBus\ControlPlane.ServiceBus.csproj" />
   <Project Path="ControlPlane.HttpEndpoint\ControlPlane.HttpEndpoint.csproj" />
   <Project Path="ControlPlane.CopilotAgent\ControlPlane.CopilotAgent.csproj" />
+  <Project Path="ControlPlane.ExternalPlugins\ControlPlane.ExternalPlugins.csproj" />
   <Project Path="ControlPlane.ServiceDefaults/ControlPlane.ServiceDefaults.csproj" />
   <Project Path="..\tests\ControlPlane.Api.E2E\ControlPlane.Api.E2E.csproj" />
+  <Project Path="..\tests\ControlPlane.ExternalPlugins.Fixture\ControlPlane.ExternalPlugins.Fixture.csproj" />
 </Solution>

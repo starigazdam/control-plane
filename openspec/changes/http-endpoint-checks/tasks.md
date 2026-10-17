@@ -20,8 +20,8 @@
 
 ## 4. Verify the complete feature slice
 
-- [ ] 4.1 Add an Aspire-backed E2E test that starts a local fabricated HTTP endpoint, reads overview status, invokes the operation, and verifies safe execution history; verify no live external requests occur. The test now compiles, but it has not executed; CI must run it to verify it passes, so keep unchecked.
-- [ ] 4.2 Run `dotnet build src/ControlPlane.slnx`, focused tests, the full available test suite, `npm run lint --prefix ui`, `npm run build --prefix ui`, and the documented OpenSpec and plugin-example checks; record environment limits separately. The full solution build passes; API (69 passed, including configuration validation) and API E2E (3 passed) tests pass; UI lint, build, and tests all pass with 14 UI tests passed; and the plugin-example, strict change, all-spec OpenSpec, and `git diff --check` checks pass. The AppHost/full test suite remains unverified because all 3 AppHost tests stopped at the unhealthy Docker runtime (`Container runtime 'docker' was found but appears to be unhealthy`), so keep unchecked.
+- [x] 4.1 Add an Aspire-backed E2E test that starts a local fabricated HTTP endpoint, reads overview status, invokes the operation, and verifies safe execution history; verify no live external requests occur. The test compiled and all 3 AppHost tests passed in CI run `39013693234` on exact head `0c30ae7de9b40c1f701c6015368609ff23266284`.
+- [x] 4.2 Run `dotnet build src/ControlPlane.slnx`, focused tests, the full available test suite, `npm run lint --prefix ui`, `npm run build --prefix ui`, and the documented OpenSpec and plugin-example checks; record environment limits separately. Exact-head CI run `39013693234` passed the build, API unit tests (67), API E2E tests (3), AppHost tests (3), and UI checks (14 tests); run `39013693233` passed container checks. OpenSpec and ADR checks passed. The local AppHost run remains blocked because Docker is unhealthy; CI provided the AppHost execution result.
 
 ## Workflow follow-up
 

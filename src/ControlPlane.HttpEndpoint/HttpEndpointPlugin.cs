@@ -1,6 +1,7 @@
 using ControlPlane.Core.Plugins;
 using ControlPlane.HttpEndpoint.Operations;
 using ControlPlane.HttpEndpoint.StatusProviders;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -16,7 +17,7 @@ public sealed class HttpEndpointPlugin : IControlPlanePlugin, IPluginServiceRegi
 {
     public string Name => "HttpEndpoint";
 
-    public void RegisterServices(IServiceCollection services)
+    public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton(
             static serviceProvider => HttpEndpointConfigurationLoader.Load(

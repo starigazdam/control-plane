@@ -1,0 +1,44 @@
+# External Plugins Fixture — runnable .http examples
+#
+# This is the fabricated external plugin used by the automated E2E tests. It
+# serves the external-plugin wire contract on loopback only. Start it with:
+#   dotnet ControlPlane.ExternalPlugins.Fixture.dll --urls http://localhost:<port> --mode normal
+#
+# Placeholders only: use localhost or example.invalid. Never commit a real
+# hostname, address, or credential.
+
+@FIXTURE = http://localhost:5099
+
+###
+# Discovery payload the bridge reads at startup.
+
+GET {{FIXTURE}}/capabilities
+Accept: application/json
+
+###
+# Read the remote health status provider.
+
+GET {{FIXTURE}}/status/health?projectId=placeholder
+Accept: application/json
+
+###
+# Validate the remote ping operation.
+
+POST {{FIXTURE}}/operations/ping/validate
+Content-Type: application/json
+
+{
+  "projectId": "placeholder",
+  "input": {}
+}
+
+###
+# Execute the remote ping operation.
+
+POST {{FIXTURE}}/operations/ping/execute
+Content-Type: application/json
+
+{
+  "projectId": "placeholder",
+  "input": {}
+}

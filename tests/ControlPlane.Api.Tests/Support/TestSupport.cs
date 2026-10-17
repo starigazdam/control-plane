@@ -9,7 +9,8 @@ using Microsoft.Extensions.Logging;
 namespace ControlPlane.Api.Tests.Support;
 internal sealed class LoopbackHttpServer : IDisposable
 {
-    private readonly HttpListener _listener = new();
+    private const int MaxStartAttempts = 10;
+    private readonly HttpListener _listener;
     private readonly CancellationTokenSource _cancellation = new();
     private readonly Func<HttpListenerContext, CancellationToken, Task> _handler;
     private readonly Task _pump;
@@ -17,10 +18,9 @@ internal sealed class LoopbackHttpServer : IDisposable
     public LoopbackHttpServer(Func<HttpListenerContext, CancellationToken, Task> handler)
     {
         _handler = handler;
-        var port = GetFreePort();
-        BaseAddress = new Uri($"http://localhost:{port}/");
-        _listener.Prefixes.Add(BaseAddress.ToString());
-        _listener.Start();
+        var (listener, baseAddress) = StartListener();
+        _listener = listener;
+        BaseAddress = baseAddress;
         _pump = Task.Run(PumpAsync);
     }
     public Uri BaseAddress { get; }
@@ -48,6 +48,28 @@ internal sealed class LoopbackHttpServer : IDisposable
                 },
                 _cancellation.Token);
         }
+    }
+    private static (HttpListener Listener, Uri BaseAddress) StartListener()
+    {
+        HttpListenerException? lastException = null;
+        for (var attempt = 0; attempt < MaxStartAttempts; attempt++)
+        {
+            var port = GetFreePort();
+            var baseAddress = new Uri($"http://localhost:{port}/");
+            var listener = new HttpListener();
+            listener.Prefixes.Add(baseAddress.ToString());
+            try
+            {
+                listener.Start();
+                return (listener, baseAddress);
+            }
+            catch (HttpListenerException exception)
+            {
+                lastException = exception;
+                try { listener.Close(); } catch (ObjectDisposedException) { }
+            }
+        }
+        throw (Exception?)lastException ?? new InvalidOperationException("Failed to start the loopback HTTP listener.");
     }
     private static int GetFreePort()
     {
@@ -84,6 +106,10 @@ internal sealed class StubHttpClientFactory : IHttpClientFactory
     private readonly StubHttpMessageHandler _handler;
     public StubHttpClientFactory(StubHttpMessageHandler handler) => _handler = handler;
     public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
+}
+internal sealed class RealHttpClientFactory : IHttpClientFactory
+{
+    public HttpClient CreateClient(string name) => new() { Timeout = Timeout.InfiniteTimeSpan };
 }
 internal sealed class FakeHostApplicationLifetime : IHostApplicationLifetime
 {

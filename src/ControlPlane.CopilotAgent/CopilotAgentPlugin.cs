@@ -2,6 +2,7 @@ using ControlPlane.Core.Plugins;
 using ControlPlane.CopilotAgent.Agent;
 using ControlPlane.CopilotAgent.Operations;
 using ControlPlane.CopilotAgent.StatusProviders;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ControlPlane.CopilotAgent;
@@ -33,7 +34,7 @@ public sealed class CopilotAgentPlugin : IControlPlanePlugin, IPluginServiceRegi
     /// Registers the <see cref="ICopilotAgentRunner"/> implementation into the DI container.
     /// Called before <see cref="Register"/> so the runner is available when operations are resolved.
     /// </summary>
-    public void RegisterServices(IServiceCollection services)
+    public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddTransient<ICopilotAgentRunner, ProcessCopilotAgentRunner>();
     }

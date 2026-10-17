@@ -4,14 +4,14 @@ namespace ControlPlane.Api.E2E;
 /// <summary>Minimal loopback HTTP server so E2E tests never contact a live endpoint.</summary>
 internal sealed class LoopbackHttpServer : IDisposable
 {
+    private const int MaxStartAttempts = 10;
     private readonly TcpListener _listener;
     private readonly CancellationTokenSource _cancellation = new();
     public LoopbackHttpServer()
     {
-        var port = GetFreePort();
-        Url = $"http://localhost:{port}/health?probe=r2";
-        _listener = new TcpListener(IPAddress.Loopback, port);
-        _listener.Start();
+        var (listener, url) = StartListener();
+        _listener = listener;
+        Url = url;
         _ = Task.Run(PumpAsync);
     }
     public string Url { get; }
@@ -35,6 +35,26 @@ internal sealed class LoopbackHttpServer : IDisposable
                 }
             });
         }
+    }
+    private static (TcpListener Listener, string Url) StartListener()
+    {
+        SocketException? lastException = null;
+        for (var attempt = 0; attempt < MaxStartAttempts; attempt++)
+        {
+            var port = GetFreePort();
+            var listener = new TcpListener(IPAddress.Loopback, port);
+            try
+            {
+                listener.Start();
+                return (listener, $"http://localhost:{port}/health?probe=r2");
+            }
+            catch (SocketException exception)
+            {
+                lastException = exception;
+                try { listener.Stop(); } catch (ObjectDisposedException) { }
+            }
+        }
+        throw (Exception?)lastException ?? new InvalidOperationException("Failed to start the loopback HTTP server.");
     }
     private static int GetFreePort()
     {

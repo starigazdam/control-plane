@@ -403,9 +403,10 @@ process, or startup discovery. It is still useful for focused unit tests.
 
 ## Migration Plan
 
-No database migration is required. Add a committed placeholder for the external
-plugin configuration with an empty plugin list. An empty list registers no
-external plugins and changes no existing behavior. The implementation adds the
+No database migration is required. No external-plugin configuration placeholder
+is committed: an absent `ExternalPlugins` section registers no external plugins
+and changes no existing behavior, and operators add the section through
+environment variables or a local, gitignored override. The implementation adds the
 `ControlPlane.ExternalPlugins` project and updates the registration contract and
 the built-in plugins in one coordinated change. Deployment and activation
 against live plugins are outside this proposal. Sequence the implementation
@@ -424,3 +425,54 @@ after #6 merges, because both changes touch `ServiceCollectionExtensions.cs` and
   behavior specified here.
 - When a second contract version exists, how should the host select a version?
   Version negotiation is deferred by this change.
+
+## Implementation decisions (recorded during apply)
+
+These decisions refine the accepted design without changing the specified
+behavior. They are normative for the implementation.
+
+- A well-formed validate response is a JSON array of strings. Any other body,
+  including a valid JSON value that is not an array of strings, maps to
+  `external_operation_invalid_response`, and `ValidateAsync` returns one
+  `"<code>: <detail>"` string.
+- In a capabilities body, a JSON `null` for an optional field is the same as an
+  absent field, so the default applies. A wrongly typed optional field (including
+  a non-string, non-null `defaultValue`) excludes that operation with a `Warning`.
+- An execute `output` value must be a string or `null`; any other value makes the
+  response invalid and maps to `external_operation_invalid_response`.
+- The host-wide duplicate-id check is the extension
+  `ControlPlane.Api.Infrastructure.CapabilityIdValidationExtensions.ValidateUniqueCapabilityIds`,
+  called from `Program.cs` after `builder.Build()` and before the host accepts
+  requests. It resolves `IEnumerable<IOperation>` and
+  `IEnumerable<IStatusProvider>` in a scope and throws a clear
+  `InvalidOperationException` on a case-insensitive collision.
+- The fixed call timeout is
+  `ControlPlane.ExternalPlugins.ExternalPluginsHttpClient.DefaultTimeout`
+  (`internal`, 10 seconds). The bridge and its adapters take an injected timeout
+  so unit tests can use a short one; `InternalsVisibleTo("ControlPlane.Api.Tests")`
+  exposes the internals to those tests, and the E2E timeout case uses the real
+  10-second value once.
+- The bridge registers one named client `ControlPlane.ExternalPlugins` with
+  `services.AddHttpClient`, removes the ServiceDefaults resilience and
+  service-discovery handlers, removes the framework request loggers, makes
+  redirects and cookies unavailable, sets
+  `SocketsHttpHandler.ActivityHeadersPropagator` to a no-output propagator, and
+  leaves the timeout to the per-call linked cancellation-token source. The
+  short-lived startup client uses an equivalent `SocketsHttpHandler` and the
+  synchronous `HttpClient.Send`.
+- The bridge project references `ControlPlane.Core` and
+  `ControlPlane.ServiceDefaults`. Because the mandated
+  `RegisterServices(IServiceCollection, IConfiguration)` signature passes
+  `IConfiguration` to every plugin, `ControlPlane.Core` adds a first-party
+  `Microsoft.Extensions.Configuration.Abstractions` package reference so the type
+  flows transitively to every plugin without pulling the ASP.NET shared framework
+  into `ControlPlane.Core` or editing each plugin's project file.
+- The fabricated plugin exposes the modes `normal`, `slow-execute`,
+  `invalid-capabilities`, `excluded-id`, and `invalid-validate`.
+- `ControlPlane.ServiceDefaults` sets the OpenTelemetry default text-map
+  propagator to a plain `TraceContextPropagator`
+  (`Sdk.SetDefaultTextMapPropagator`) so the HTTP client instrumentation leaves
+  header injection to the .NET runtime, which honors the bridge's no-output
+  `ActivityHeadersPropagator`; as a side effect OpenTelemetry no longer injects
+  `baggage`, while runtime W3C `traceparent` propagation for other clients is
+  unchanged.

@@ -1,0 +1,340 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Control Plane external plugin contract",
+    "version": "1.0.0",
+    "description": "Wire contract a separately deployed external plugin serves to the Control Plane external-plugins bridge. JSON only. The contract is unauthenticated: run external plugins on a trusted network until #57."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5099",
+      "description": "Placeholder loopback plugin"
+    },
+    {
+      "url": "https://example.invalid",
+      "description": "Placeholder deployed plugin"
+    }
+  ],
+  "paths": {
+    "/capabilities": {
+      "get": {
+        "operationId": "getCapabilities",
+        "summary": "List the remote status provider ids and operation definitions.",
+        "responses": {
+          "200": {
+            "description": "The plugin capabilities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capabilities"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/status/{id}": {
+      "get": {
+        "operationId": "getStatus",
+        "summary": "Read one remote status provider.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A status snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusSnapshot"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/{id}/validate": {
+      "post": {
+        "operationId": "validateOperation",
+        "summary": "Validate one remote operation against its input.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The remote validation errors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/{id}/execute": {
+      "post": {
+        "operationId": "executeOperation",
+        "summary": "Execute one remote operation.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The remote execution result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Capabilities": {
+        "type": "object",
+        "required": ["statusProviderIds", "operations"],
+        "properties": {
+          "statusProviderIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationDefinition"
+            }
+          }
+        }
+      },
+      "OperationDefinition": {
+        "type": "object",
+        "required": ["id", "displayName"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "requiresConfirmation": {
+            "type": "boolean"
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationParameter"
+            }
+          }
+        }
+      },
+      "OperationParameter": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "isRequired": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string"
+          },
+          "defaultValue": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "OperationRequest": {
+        "type": "object",
+        "required": ["projectId", "input"],
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        }
+      },
+      "ValidateResponse": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "StatusSnapshot": {
+        "type": "object",
+        "required": ["projectId", "providerId", "overallLevel", "observedAtUtc", "signals"],
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "providerId": {
+            "type": "string"
+          },
+          "overallLevel": {
+            "$ref": "#/components/schemas/StatusLevel"
+          },
+          "observedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusSignal"
+            }
+          }
+        }
+      },
+      "StatusSignal": {
+        "type": "object",
+        "required": ["id", "title", "description", "level", "observedAtUtc"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/StatusLevel"
+          },
+          "observedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "link": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "StatusLevel": {
+        "type": "string",
+        "enum": ["Unknown", "Healthy", "Warning", "Critical"]
+      },
+      "ExecuteResult": {
+        "type": "object",
+        "required": ["status", "message"],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/OperationExecutionStatus"
+          },
+          "message": {
+            "type": "string"
+          },
+          "startedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "output": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        }
+      },
+      "OperationExecutionStatus": {
+        "type": "string",
+        "enum": ["Succeeded", "Failed", "Rejected"]
+      }
+    }
+  }
+}

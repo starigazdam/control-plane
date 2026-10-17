@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Trace;
 namespace ControlPlane.Api.Tests;
+[Collection(ProcessGlobalObserverCollection.Name)]
 public sealed class HttpEndpointPrivacyTests
 {
     private const string CheckUrl = "health?secretQuery=do-not-log";

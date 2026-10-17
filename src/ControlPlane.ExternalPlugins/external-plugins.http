@@ -1,0 +1,35 @@
+# External Plugins Bridge — runnable .http examples
+#
+# Prerequisites:
+#   1. Control Plane API running locally (default: http://localhost:5149).
+#   2. ExternalPlugins__Plugins__0__Name and ExternalPlugins__Plugins__0__BaseUrl
+#      configured, for example through .env (committed placeholders) or .env.local
+#      (gitignored). The example below assumes a plugin named "sample" that exposes
+#      a remote operation "ping".
+#
+# Secrets: HOST and PROJECT_ID come from .env via {{$dotenv ...}}. Never commit a
+# real hostname, address, or credential here; override locally in .env.local.
+
+@HOST = {{$dotenv HOST}}
+@PROJECT_ID = {{$dotenv PROJECT_ID}}
+
+###
+# Execute an external operation through the host. The bridge exposes the remote
+# operation as {pluginName}.{remoteId}. RequiresConfirmation is metadata only; the
+# host does not enforce it in this slice.
+
+POST {{HOST}}/api/operations/execute
+Content-Type: application/json
+
+{
+  "projectId": "{{PROJECT_ID}}",
+  "operationId": "sample.ping",
+  "requestedBy": "engineer@example.com",
+  "input": {}
+}
+
+###
+# Retrieve the last 20 operation executions (includes external plugin history).
+
+GET {{HOST}}/api/operations/history?take=20
+Accept: application/json

@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Adds bounded scheduled checks for configured HTTP endpoints while preserving manual checks and safe result handling.
+Adds scheduled checks for configured HTTP endpoints while preserving manual checks and safe results.
+
+This delta follows the manual-check slice. Its OpenSpec change is still active, so this delta uses only ADDED requirements. Before implementation, reconcile these requirements with the manual change's archived baseline. Apply scheduling only to endpoints with valid effective schedules; keep all other endpoints manual-only.
 
 ## ADDED Requirements
 
@@ -22,54 +24,104 @@ A non-blank endpoint `cron` value SHALL override `HttpEndpoint__DefaultCron`. An
 - **WHEN** both schedule values are absent or blank
 - **THEN** the endpoint remains manual-only
 
-### Requirement: Validate cron schedule syntax
+### Requirement: Define cron fields and operators
 
-Schedules SHALL use five numeric fields: minute `0-59`, hour `0-23`, day-of-month `1-31`, month `1-12`, and day-of-week `0-6` where Sunday is `0`. The parser SHALL support `*`, lists, ascending ranges, and positive steps on a wildcard or range. It SHALL reject names, aliases, seconds, years, macros, descending ranges, and out-of-range values.
+Schedules SHALL use five numeric fields: minute `0-59`, hour `0-23`, day `1-31`, month `1-12`, and weekday `0-6` where Sunday is `0`. Support `*`, comma-separated lists, and ascending ranges. Reject empty list items, names, aliases, seconds, years, macros, and descending ranges.
 
-#### Scenario: Cron expression uses supported syntax
-- **WHEN** a five-field numeric expression uses supported values and operators
-- **THEN** the system accepts it
+#### Scenario: Parse supported fields
+- **WHEN** the expression is `*/15 9-17 * * 1-5`
+- **THEN** the system accepts it as a valid five-field schedule
 
-#### Scenario: Cron expression uses unsupported syntax
-- **WHEN** an expression uses an unsupported field, operator, or value
+#### Scenario: Reject names and aliases
+- **WHEN** an expression uses names, aliases, seconds, years, macros, or descending ranges
 - **THEN** the system rejects that schedule
 
-### Requirement: Match cron calendar fields
+### Requirement: Parse cron steps and values
 
-If day-of-month and day-of-week are both restricted, either field may match the day. Otherwise, the restricted field controls the day match. A next occurrence SHALL be strictly later than the evaluation instant.
+Steps SHALL be positive integers applied only to `*` or ascending ranges. A step SHALL not exceed the field's value count, or the range's value count when used on a range. Single-value steps SHALL be rejected. Leading zeros SHALL mean decimal values. Duplicate list values SHALL act as one value.
+
+#### Scenario: Parse a valid range step
+- **WHEN** a range has a positive step no greater than its value count
+- **THEN** the system accepts the schedule
+
+#### Scenario: Reject invalid steps
+- **WHEN** a step is zero, exceeds its allowed count, or follows a single value
+- **THEN** the system rejects the schedule
+
+### Requirement: Parse cron whitespace and value types
+
+Trim outer ASCII spaces and separate fields with one or more ASCII spaces. Reject tabs and other whitespace. A present non-string endpoint `cron` value SHALL be invalid.
+
+#### Scenario: Parse ASCII spaces
+- **WHEN** an expression has outer ASCII spaces or multiple ASCII spaces between fields
+- **THEN** the system accepts the schedule if its fields are valid
+
+#### Scenario: Reject unsupported whitespace or type
+- **WHEN** an expression contains a tab or an endpoint `cron` value is not a string
+- **THEN** the system rejects that schedule
+
+### Requirement: Match cron day fields
+
+Treat `*` and `*/step` as unrestricted day fields. If day-of-month and weekday are both restricted, either field SHALL match. Otherwise, the restricted field SHALL match. If both are unrestricted, any day SHALL match.
 
 #### Scenario: Both day fields are restricted
-- **WHEN** day-of-month and day-of-week are both restricted
-- **THEN** a date matches when either field matches
+- **WHEN** the expression is `0 9 1 * 1`
+- **THEN** it matches Mondays and the first day of each month
+
+#### Scenario: A stepped wildcard is unrestricted
+- **WHEN** day-of-month is `*/2` and weekday is `1`
+- **THEN** weekday controls the day match
+
+### Requirement: Reject schedules with no occurrence
+
+A valid schedule SHALL have at least one matching instant within a complete 400-year Gregorian calendar cycle. The next occurrence SHALL be strictly later than the evaluation instant.
+
+#### Scenario: Schedule has no valid date
+- **WHEN** an expression can never match a calendar date, such as `0 0 30 2 *`
+- **THEN** the system rejects that schedule
 
 #### Scenario: Calculate the next occurrence
-- **WHEN** the system calculates an occurrence from an evaluation instant
+- **WHEN** the system calculates a future occurrence from an evaluation instant
 - **THEN** the result is strictly later than that instant
 
-### Requirement: Handle invalid schedules without disabling manual checks
+### Requirement: Keep invalid schedules manual-only
 
-An invalid endpoint schedule SHALL disable scheduling only for that endpoint. An invalid global default SHALL disable scheduling only for endpoints that inherit it. Neither error SHALL fail startup. The system SHALL report one safe warning for each invalid endpoint schedule and one for an invalid global default. A valid endpoint override SHALL remain active when the global default is invalid.
+An invalid endpoint schedule SHALL disable scheduling only for that endpoint and SHALL preserve its valid manual checks. An invalid global default SHALL disable scheduling only for valid endpoints that inherit it. Invalid schedules SHALL NOT fail startup. A valid endpoint override SHALL remain active when the global default is invalid.
 
-#### Scenario: Invalid endpoint schedule
-- **WHEN** an endpoint schedule is invalid
-- **THEN** the endpoint stays available for valid manual checks
-- **AND** the system reports one safe warning for its configuration entry
+#### Scenario: Endpoint schedule is invalid
+- **WHEN** an otherwise valid endpoint has an invalid schedule
+- **THEN** it remains available for manual checks and has no scheduled checks
 
-#### Scenario: Invalid inherited default
-- **WHEN** the global default is invalid and an endpoint has no valid override
-- **THEN** the endpoint remains manual-only
-- **AND** the system reports one safe warning for the global setting
+#### Scenario: Global default is invalid
+- **WHEN** the global default is invalid and a valid endpoint inherits it
+- **THEN** that endpoint remains manual-only
 
-#### Scenario: Valid override with invalid default
-- **WHEN** an endpoint has a valid schedule and the global default is invalid
+#### Scenario: Valid override and invalid default
+- **WHEN** an endpoint has a valid override and the global default is invalid
 - **THEN** the endpoint uses its own schedule
+
+### Requirement: Report invalid schedule warnings
+
+An invalid endpoint schedule SHALL produce one safe `Warning` signal with code `invalid_cron` and ID `http-endpoint-config-cron-{index}`. An invalid global default SHALL produce one safe `Warning` signal with ID `http-endpoint-config-default-cron` only when a valid endpoint inherits it. Valid schedules SHALL NOT produce the current schedule-ignored warning.
+
+#### Scenario: Endpoint schedule warning is emitted
+- **WHEN** a valid endpoint entry has invalid `cron` syntax
+- **THEN** the system emits one fixed warning for its array index without its URL, name, or schedule text
+
+#### Scenario: Unused invalid default does not warn
+- **WHEN** the global default is invalid but no valid endpoint inherits it
+- **THEN** the system emits no warning for that unused setting
+
+#### Scenario: Entry has another validation error
+- **WHEN** an endpoint entry is already excluded for a non-schedule validation error
+- **THEN** the system emits only its existing configuration warning
 
 ### Requirement: Start scheduled checks in UTC
 
-The scheduler SHALL run in the API process. It SHALL interpret schedules in UTC and SHALL run the first check at the first matching instant strictly after startup. It SHALL NOT run an immediate startup check.
+The scheduler SHALL run in the API process and interpret schedules in UTC. It SHALL register the first occurrence strictly after startup and SHALL NOT run an immediate startup check.
 
 #### Scenario: Scheduler starts
-- **WHEN** the API starts with valid effective schedules
+- **WHEN** the API starts with one or more valid effective schedules
 - **THEN** each endpoint's next future UTC occurrence is registered
 - **AND** no immediate request is sent
 
@@ -79,81 +131,117 @@ The scheduler SHALL load configuration once at startup. Configuration changes SH
 
 #### Scenario: Configuration changes while active
 - **WHEN** endpoint configuration changes while the API runs
-- **THEN** the active schedules remain unchanged until restart
+- **THEN** active schedules remain unchanged until restart
 
 #### Scenario: Application shuts down
 - **WHEN** application shutdown begins
 - **THEN** the scheduler starts no further checks and cancels its in-flight requests
 
-### Requirement: Do not replay missed occurrences
+### Requirement: Handle late and missed occurrences
 
-The scheduler SHALL NOT queue or replay occurrences missed while stopped or busy. After a missed or skipped occurrence, it SHALL calculate the next future occurrence.
+If the scheduler wakes after one due instant but before a later occurrence is due, it MAY run once for that instant. If two or more occurrences have elapsed, it SHALL skip all elapsed occurrences. A due occurrence SHALL be consumed when skipped for endpoint overlap or unavailable shared capacity; it SHALL NOT be queued.
 
-#### Scenario: Process misses an occurrence
-- **WHEN** the API is stopped or busy at a scheduled instant
-- **THEN** the system skips that occurrence and does not replay it later
+#### Scenario: Scheduler wakes late for one occurrence
+- **WHEN** one due instant has passed and no later occurrence has passed
+- **THEN** the scheduler runs at most one check for the due instant
 
-### Requirement: Limit scheduled overlap and concurrency
+#### Scenario: Scheduler wakes after several occurrences
+- **WHEN** two or more due instants have passed
+- **THEN** the scheduler skips all elapsed occurrences and selects the next future instant
 
-The system SHALL allow at most one scheduled check per endpoint at a time. It SHALL cap active endpoint requests across scheduled checks, overview scans, and manual operations at 20 per API process. A scheduled occurrence SHALL be skipped, not queued, when the endpoint is active or shared capacity is unavailable.
+#### Scenario: Endpoint or capacity is busy
+- **WHEN** an endpoint or the shared request gate is busy at a due instant
+- **THEN** the scheduler consumes and skips that occurrence without queuing it
 
-#### Scenario: Same endpoint is still active
-- **WHEN** a scheduled check is active at the endpoint's next occurrence
-- **THEN** the system skips the new occurrence without queuing it
+### Requirement: Handle system clock changes
+
+The scheduler SHALL use the API process's UTC wall clock. A forward clock jump SHALL apply the late-occurrence rule. A backward jump SHALL NOT run a consumed due instant twice.
+
+#### Scenario: Clock moves backward after a scheduled run
+- **WHEN** the UTC clock moves backward after an occurrence was consumed
+- **THEN** the scheduler does not run that occurrence again
+
+### Requirement: Bound endpoint overlap and concurrency
+
+The system SHALL allow at most one active check for each endpoint across scheduled checks, overview scans, and manual operations. It SHALL cap active endpoint requests at 20 per API process. Scheduled checks SHALL skip, not wait or queue, when the endpoint or shared request gate is busy.
+
+#### Scenario: Scheduled endpoint is already active
+- **WHEN** any check for an endpoint is active at its scheduled instant
+- **THEN** the scheduler skips that occurrence
 
 #### Scenario: Shared capacity is full
-- **WHEN** all 20 shared request slots are active at an occurrence
-- **THEN** the system skips that occurrence without queuing it
+- **WHEN** all 20 request slots are active at a scheduled instant
+- **THEN** the scheduler skips that occurrence without queuing it
 
-### Requirement: Preserve check timeout and overview coordination
+### Requirement: Bound scheduled check time
 
-Scheduled checks SHALL use the configured endpoint timeout and shared request-capacity gate. They SHALL NOT join or populate the overview cache. Overview scans SHALL retain their in-flight sharing, 15-second cache, 12-second budget, and caller-cancellation behavior. Manual operations SHALL continue to perform fresh checks.
+A scheduled check SHALL use the configured endpoint timeout. On timeout, it SHALL cancel the request and record the safe timeout outcome. Shutdown cancellation SHALL NOT replace the latest outcome.
 
 #### Scenario: Scheduled check reaches its timeout
 - **WHEN** a scheduled request exceeds its endpoint timeout
 - **THEN** the system cancels it and records a safe timeout outcome
 
-#### Scenario: Overview scan overlaps a scheduled check
-- **WHEN** both need endpoint capacity at the same time
-- **THEN** both use the shared 20-request limit
-- **AND** the scheduled result does not alter the overview cache
+### Requirement: Bound manual and overview capacity waits
 
-### Requirement: Show latest scheduled results in status
+Manual and overview checks SHALL wait for endpoint capacity only within their existing deadlines. An endpoint timeout SHALL start when the check is requested and include capacity wait and HTTP time. If a manual operation times out before it gets a slot, it SHALL send no request and SHALL return the safe `endpoint_timeout` result. The overview scan's 12-second budget SHALL also bound its waits.
 
-For a scheduled endpoint, overview status SHALL use its latest completed scheduled outcome and SHALL NOT trigger another request for that endpoint. Before the first completed check, status SHALL be `Unknown`. Map expected status to `Healthy`, unexpected status to `Warning`, and timeout or transport failure to `Critical`. Keep the outcome observation time.
+#### Scenario: Manual operation times out while waiting
+- **WHEN** capacity stays full until the endpoint timeout expires
+- **THEN** the operation sends no request and returns `endpoint_timeout`
 
-#### Scenario: No scheduled result exists
-- **WHEN** overview status reads an endpoint before its first scheduled check completes
-- **THEN** it reports `Unknown` and sends no request for that endpoint
+#### Scenario: Overview scan exhausts its budget
+- **WHEN** endpoint work remains incomplete at the 12-second scan budget
+- **THEN** the system cancels unfinished work and returns safe timeout outcomes
 
-#### Scenario: A scheduled result exists
-- **WHEN** overview status reads an endpoint with a completed scheduled check
-- **THEN** it reports the mapped result and its observation time without another request
+### Requirement: Preserve manual-only overview behavior
 
-### Requirement: Keep scheduled outcomes out of operation history
+Overview status SHALL use the latest scheduled outcome for endpoints with valid effective schedules and SHALL NOT probe those endpoints. Endpoints without effective schedules SHALL keep the existing overview scan, 15-second cache, in-flight sharing, and 12-second budget. Cancellation SHALL stop only the requesting caller's wait, not the shared scan. Scheduled checks SHALL NOT join or populate the overview cache.
 
-Scheduled checks SHALL NOT create operation-execution history entries. The system SHALL retain only each endpoint's latest scheduled outcome in process memory and SHALL clear it on restart. Manual operations SHALL continue to use the existing operation-history path.
+#### Scenario: Overview has scheduled and manual-only endpoints
+- **WHEN** overview status reads a mixed configuration
+- **THEN** scheduled endpoints use their latest scheduled outcomes
+- **AND** manual-only endpoints use the overview scan
+
+### Requirement: Show scheduled endpoint status
+
+Before an endpoint's first scheduled check completes, overview status SHALL expose an `Unknown` signal timestamped at the status-read time. Later signals SHALL map expected status to `Healthy`, unexpected status to `Warning`, and timeout or transport failure to `Critical`. Each signal SHALL retain the check's observation time.
+
+#### Scenario: No scheduled outcome exists
+- **WHEN** overview reads a scheduled endpoint before its first completed check
+- **THEN** it reports `Unknown` without sending a request
+
+#### Scenario: Scheduled outcome exists
+- **WHEN** overview reads an endpoint with a completed scheduled check
+- **THEN** it reports the mapped outcome and its observation time without sending a request
+
+### Requirement: Define scheduled status freshness
+
+The system SHALL keep the latest completed scheduled outcome until another scheduled check completes. It SHALL NOT mark the outcome stale by age. A manual check SHALL NOT replace scheduled status. Shutdown cancellation SHALL NOT replace the last outcome with a timeout. Restart SHALL clear all in-memory scheduled outcomes.
+
+#### Scenario: Scheduled status ages
+- **WHEN** no new scheduled check completes after a prior result
+- **THEN** overview retains that result and its original observation time
+
+#### Scenario: Manual check or shutdown occurs
+- **WHEN** a manual check runs or shutdown cancels scheduled work
+- **THEN** scheduled overview status remains unchanged
+
+### Requirement: Keep scheduled checks out of operation history
+
+Scheduled checks SHALL NOT create operation-execution history entries. The system SHALL retain only each endpoint's latest scheduled outcome in process memory. Manual operations SHALL continue to use the existing operation-history path.
 
 #### Scenario: Scheduled check completes
 - **WHEN** a scheduled check succeeds or fails
 - **THEN** the latest in-memory status is updated without an operation-history entry
 
-#### Scenario: API restarts
-- **WHEN** the API restarts
-- **THEN** prior scheduled outcomes are cleared and the system waits for the next occurrence
+### Requirement: Preserve configured requests and privacy bounds
 
-### Requirement: Keep scheduled requests bounded and private
+Scheduled checks SHALL use only configured `GET` or `HEAD` methods. They SHALL accept no caller-provided URL, method, headers, or body. They SHALL send at most one request, follow no redirects, retry none, and read no response content. Results, status, logs, and traces SHALL NOT contain URLs, query values, response data, or raw exception text. Metrics SHALL NOT use endpoint-specific labels.
 
-Scheduled checks SHALL use only configured `GET` or `HEAD` methods. They SHALL accept no caller-provided URL, method, headers, or body. They SHALL send at most one request, follow no redirects, retry none, and read no response content.
-
-#### Scenario: Endpoint redirects or returns a body
+#### Scenario: Scheduled endpoint redirects or returns a body
 - **WHEN** a scheduled endpoint returns a redirect or response body
 - **THEN** the system does not follow the redirect or read the body
 - **AND** it compares the status with the configured expected status
-
-### Requirement: Limit scheduled observability data
-
-Results, status, logs, and traces SHALL NOT contain configured URLs, query values, response headers, response bodies, or raw exception text. The named client's request logs and URL-bearing trace data SHALL remain suppressed. Metrics SHALL NOT use endpoint-specific labels.
 
 #### Scenario: Scheduled check emits observability data
 - **WHEN** a scheduled check emits logs, traces, metrics, or status

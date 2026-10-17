@@ -93,64 +93,91 @@ internal static class ExternalCapabilitiesParser
         JsonElement element,
         List<ExternalCapabilityExclusion> exclusions)
     {
-        var candidates = new List<(string Id, string Value)>();
-        var index = 0;
+        var entries = element.EnumerateArray().ToList();
+        var rawIds = RawStringIds(entries);
+        var duplicateIds = DuplicateIds(rawIds);
 
-        foreach (var item in element.EnumerateArray())
+        var ids = new List<string>(entries.Count);
+        for (var index = 0; index < entries.Count; index++)
         {
+            var item = entries[index];
+            var rawId = rawIds[index];
+
             if (item.ValueKind != JsonValueKind.String)
             {
                 exclusions.Add(new ExternalCapabilityExclusion(
                     StatusProviderKind,
                     $"#{index}",
                     "A statusProviderIds element is not a string and was excluded."));
+                continue;
+            }
+
+            var id = rawId ?? string.Empty;
+            if (rawId is not null && duplicateIds.Contains(rawId))
+            {
+                exclusions.Add(new ExternalCapabilityExclusion(
+                    StatusProviderKind,
+                    id,
+                    $"'{id}' is listed more than once and was excluded."));
+            }
+            else if (!IsValidRemoteId(id))
+            {
+                exclusions.Add(new ExternalCapabilityExclusion(
+                    StatusProviderKind,
+                    id,
+                    $"'{id}' is not a valid remote id and was excluded."));
+            }
+            else if (string.Equals(id, "bridge", StringComparison.OrdinalIgnoreCase))
+            {
+                exclusions.Add(new ExternalCapabilityExclusion(
+                    StatusProviderKind,
+                    id,
+                    $"'{id}' is a reserved status provider id and was excluded."));
             }
             else
             {
-                var id = item.GetString() ?? string.Empty;
-                if (!IsValidRemoteId(id))
-                {
-                    exclusions.Add(new ExternalCapabilityExclusion(
-                        StatusProviderKind,
-                        id,
-                        $"'{id}' is not a valid remote id and was excluded."));
-                }
-                else if (string.Equals(id, "bridge", StringComparison.OrdinalIgnoreCase))
-                {
-                    exclusions.Add(new ExternalCapabilityExclusion(
-                        StatusProviderKind,
-                        id,
-                        $"'{id}' is a reserved status provider id and was excluded."));
-                }
-                else
-                {
-                    candidates.Add((id, id));
-                }
+                ids.Add(id);
             }
-
-            index++;
         }
 
-        return ExcludeDuplicateGroups(candidates, StatusProviderKind, exclusions);
+        return ids;
     }
 
     private static IReadOnlyList<ExternalOperationDefinition> ParseOperations(
         JsonElement element,
         List<ExternalCapabilityExclusion> exclusions)
     {
-        var candidates = new List<(string Id, ExternalOperationDefinition Value)>();
-        var index = 0;
+        var entries = element.EnumerateArray().ToList();
+        var rawIds = entries
+            .Select(item => item.ValueKind == JsonValueKind.Object ? GetIdentifier(item) : null)
+            .ToList();
+        var duplicateIds = DuplicateIds(rawIds);
 
-        foreach (var item in element.EnumerateArray())
+        var operations = new List<ExternalOperationDefinition>(entries.Count);
+        for (var index = 0; index < entries.Count; index++)
         {
+            var item = entries[index];
+            var rawId = rawIds[index];
+
             if (item.ValueKind != JsonValueKind.Object)
             {
                 exclusions.Add(new ExternalCapabilityExclusion(
                     OperationKind,
                     $"#{index}",
                     "An operations element is not an object and was excluded."));
+                continue;
             }
-            else if (!TryParseOperation(item, out var operation, out var reason))
+
+            if (rawId is not null && duplicateIds.Contains(rawId))
+            {
+                exclusions.Add(new ExternalCapabilityExclusion(
+                    OperationKind,
+                    rawId,
+                    $"'{rawId}' is listed more than once and was excluded."));
+                continue;
+            }
+
+            if (!TryParseOperation(item, out var operation, out var reason))
             {
                 exclusions.Add(new ExternalCapabilityExclusion(
                     OperationKind,
@@ -166,43 +193,29 @@ internal static class ExternalCapabilitiesParser
             }
             else
             {
-                candidates.Add((operation.RemoteId, operation));
+                operations.Add(operation);
             }
-
-            index++;
         }
 
-        return ExcludeDuplicateGroups(candidates, OperationKind, exclusions);
+        return operations;
     }
 
-    private static List<TValue> ExcludeDuplicateGroups<TValue>(
-        IReadOnlyList<(string Id, TValue Value)> candidates,
-        string kind,
-        List<ExternalCapabilityExclusion> exclusions)
-    {
-        var duplicateIds = candidates
-            .GroupBy(candidate => candidate.Id, StringComparer.OrdinalIgnoreCase)
-            .Where(group => group.Count() > 1)
-            .Select(group => group.Key)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    private static IReadOnlyList<string?> RawStringIds(IReadOnlyList<JsonElement> entries)
+        => entries.Select(item => item.ValueKind == JsonValueKind.String ? item.GetString() : null).ToList();
 
-        var valid = new List<TValue>(candidates.Count);
-        foreach (var (id, value) in candidates)
+    private static HashSet<string> DuplicateIds(IReadOnlyList<string?> rawIds)
+    {
+        var duplicateIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var id in rawIds)
         {
-            if (duplicateIds.Contains(id))
+            if (id is not null && !seen.Add(id))
             {
-                exclusions.Add(new ExternalCapabilityExclusion(
-                    kind,
-                    id,
-                    $"'{id}' is listed more than once and was excluded."));
-            }
-            else
-            {
-                valid.Add(value);
+                duplicateIds.Add(id);
             }
         }
 
-        return valid;
+        return duplicateIds;
     }
 
     private static bool TryParseOperation(

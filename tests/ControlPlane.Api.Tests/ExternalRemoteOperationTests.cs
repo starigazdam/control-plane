@@ -85,6 +85,81 @@ public sealed class ExternalRemoteOperationTests
     }
 
     [Fact]
+    public async Task Execute_with_an_invalid_response_charset_returns_a_failed_result_without_throwing()
+    {
+        using var server = new LoopbackHttpServer((context, _) =>
+        {
+            context.Response.StatusCode = 200;
+            context.Response.ContentType = "application/json; charset=bogus";
+            var bytes = Encoding.UTF8.GetBytes("not json");
+            context.Response.ContentLength64 = bytes.Length;
+            context.Response.OutputStream.Write(bytes);
+            context.Response.Close();
+            return Task.CompletedTask;
+        });
+
+        var operation = new ExternalRemoteOperation(
+            "sample",
+            new ExternalOperationDefinition("ping", "Ping", "Pings.", false, []),
+            server.BaseAddress,
+            new RealHttpClientFactory(),
+            TimeSpan.FromSeconds(10));
+
+        var result = await operation.ExecuteAsync(Context(), CancellationToken.None);
+
+        Assert.Equal(OperationExecutionStatus.Failed, result.Status);
+        Assert.Equal(ExternalOperationErrorCodes.InvalidResponse, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Execute_status_match_is_ordinal_case_sensitive()
+    {
+        var handler = new StubHttpMessageHandler((_, _) => Task.FromResult(Json("""{ "status": "succeeded", "message": "ok" }""")));
+
+        var result = await CreateOperation(handler).ExecuteAsync(Context(), CancellationToken.None);
+
+        Assert.Equal(OperationExecutionStatus.Failed, result.Status);
+        Assert.Equal(ExternalOperationErrorCodes.InvalidResponse, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Execute_passes_an_empty_error_code_through_unchanged()
+    {
+        var handler = new StubHttpMessageHandler((_, _) => Task.FromResult(Json("""{ "status": "Failed", "message": "m", "errorCode": "" }""")));
+
+        var result = await CreateOperation(handler).ExecuteAsync(Context(), CancellationToken.None);
+
+        Assert.Equal(OperationExecutionStatus.Failed, result.Status);
+        Assert.Equal(string.Empty, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Transport_failure_detail_is_fixed_and_does_not_leak_the_exception_message()
+    {
+        var handler = new StubHttpMessageHandler((_, _) => throw new HttpRequestException("down at host:5099"));
+
+        var result = await CreateOperation(handler).ExecuteAsync(Context(), CancellationToken.None);
+        var errors = await CreateOperation(handler).ValidateAsync(Context(), CancellationToken.None);
+
+        Assert.Equal(ExternalOperationErrorCodes.TransportFailed, result.ErrorCode);
+        Assert.DoesNotContain("host:5099", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("host:5099", Assert.Single(errors), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("[null]")]
+    [InlineData("[\"a\", null]")]
+    public async Task Validate_with_a_non_string_element_is_invalid(string body)
+    {
+        var handler = new StubHttpMessageHandler((_, _) => Task.FromResult(Json(body)));
+
+        var errors = await CreateOperation(handler).ValidateAsync(Context(), CancellationToken.None);
+
+        var error = Assert.Single(errors);
+        Assert.StartsWith($"{ExternalOperationErrorCodes.InvalidResponse}: ", error);
+    }
+
+    [Fact]
     public async Task Caller_cancellation_propagates_instead_of_mapping_to_a_timeout()
     {
         var handler = new StubHttpMessageHandler(async (_, token) =>

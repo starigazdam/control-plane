@@ -9,7 +9,12 @@
 //   invalid-capabilities - a capabilities body missing the required arrays
 //   excluded-id          - a capabilities body with an invalid and a reserved capability
 //   invalid-validate     - POST /operations/{id}/validate returns a non-2xx status
+//
+// Test-only request recording (all modes):
+//   GET  /__requests        - the recorded method, path, and header names per request
+//   POST /__requests/reset  - clear the recording
 
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace ControlPlane.ExternalPlugins.Fixture;
@@ -25,6 +30,29 @@ public static class FixtureApp
         var builder = WebApplication.CreateBuilder(args);
         builder.Logging.ClearProviders();
         var app = builder.Build();
+
+        var requests = new RequestLog();
+
+        app.Use(async (context, next) =>
+        {
+            if (!context.Request.Path.StartsWithSegments("/__requests"))
+            {
+                requests.Add(new RecordedRequest(
+                    context.Request.Method,
+                    context.Request.Path.Value ?? string.Empty,
+                    context.Request.Headers.Keys.ToArray()));
+            }
+
+            await next(context);
+        });
+
+        app.MapGet("/__requests", () => Results.Json(requests.Snapshot()));
+
+        app.MapPost("/__requests/reset", () =>
+        {
+            requests.Clear();
+            return Results.Ok();
+        });
 
         app.MapGet("/capabilities", () =>
         {
@@ -150,6 +178,24 @@ public static class FixtureApp
             && input.ValueKind == JsonValueKind.Object
             && input.TryGetProperty(name, out var value)
             && value.ValueKind is not JsonValueKind.Null and not JsonValueKind.Undefined;
+    }
+
+    internal sealed record RecordedRequest(string Method, string Path, IReadOnlyList<string> Headers);
+
+    internal sealed class RequestLog
+    {
+        private readonly ConcurrentQueue<RecordedRequest> _requests = new();
+
+        public void Add(RecordedRequest request) => _requests.Enqueue(request);
+
+        public void Clear()
+        {
+            while (_requests.TryDequeue(out _))
+            {
+            }
+        }
+
+        public IReadOnlyList<RecordedRequest> Snapshot() => _requests.ToArray();
     }
 
     private static string? ReadArgument(string[] args, string name)

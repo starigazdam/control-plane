@@ -30,7 +30,7 @@ change; there is no hot reload.
 {
   "ExternalPlugins": {
     "Plugins": [
-      { "Name": "sample", "BaseUrl": "http://plugin.internal:5099" }
+      { "Name": "sample", "BaseUrl": "http://localhost:5099" }
     ]
   }
 }
@@ -38,7 +38,10 @@ change; there is no hot reload.
 
 The equivalent environment keys are
 `ExternalPlugins__Plugins__0__Name` and `ExternalPlugins__Plugins__0__BaseUrl`.
-An empty or missing list registers no external plugins and makes no request.
+No `ExternalPlugins` configuration placeholder is committed. When the
+`ExternalPlugins` section is absent the bridge registers no plugins and makes no
+request; add the section through environment variables or a local, gitignored
+override.
 
 - `Name` must be 1-32 lowercase ASCII letters, digits, or hyphens and start with
   a letter. It is the namespace for every exposed id.

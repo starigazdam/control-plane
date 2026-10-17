@@ -14,7 +14,7 @@ internal static class ExternalJson
     private static JsonSerializerOptions Create()
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
-        options.Converters.Add(new JsonStringEnumConverter());
+        options.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false));
         return options;
     }
 }

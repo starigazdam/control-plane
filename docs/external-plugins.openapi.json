@@ -178,7 +178,8 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "requiresConfirmation": {
             "type": "boolean"
@@ -202,7 +203,8 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "isRequired": {
             "type": "boolean"

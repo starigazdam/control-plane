@@ -85,6 +85,10 @@ internal sealed class StubHttpClientFactory : IHttpClientFactory
     public StubHttpClientFactory(StubHttpMessageHandler handler) => _handler = handler;
     public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
 }
+internal sealed class RealHttpClientFactory : IHttpClientFactory
+{
+    public HttpClient CreateClient(string name) => new() { Timeout = Timeout.InfiniteTimeSpan };
+}
 internal sealed class FakeHostApplicationLifetime : IHostApplicationLifetime
 {
     private readonly CancellationTokenSource _stopping = new();

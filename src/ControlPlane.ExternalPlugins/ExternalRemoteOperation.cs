@@ -56,9 +56,14 @@ internal sealed class ExternalRemoteOperation : IOperation
         try
         {
             var errors = JsonSerializer.Deserialize<List<string>>(outcome.Body, ExternalJson.Options);
-            if (errors is null)
+            if (errors is null || errors.Any(error => error is null))
             {
-                return [Format(ExternalOperationErrorCodes.InvalidResponse, "The remote validate response was empty.")];
+                return
+                [
+                    Format(
+                        ExternalOperationErrorCodes.InvalidResponse,
+                        "The remote validate response was not a JSON array of strings.")
+                ];
             }
 
             return errors;
@@ -129,7 +134,7 @@ internal sealed class ExternalRemoteOperation : IOperation
                 response.Message,
                 startedAtUtc,
                 DateTimeOffset.UtcNow,
-                string.IsNullOrEmpty(response.ErrorCode) ? null : response.ErrorCode,
+                response.ErrorCode,
                 output);
         }
         catch (JsonException)
@@ -154,19 +159,19 @@ internal sealed class ExternalRemoteOperation : IOperation
 
     private static bool TryParseStatus(string status, out OperationExecutionStatus parsed)
     {
-        if (string.Equals(status, nameof(OperationExecutionStatus.Succeeded), StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(status, nameof(OperationExecutionStatus.Succeeded), StringComparison.Ordinal))
         {
             parsed = OperationExecutionStatus.Succeeded;
             return true;
         }
 
-        if (string.Equals(status, nameof(OperationExecutionStatus.Failed), StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(status, nameof(OperationExecutionStatus.Failed), StringComparison.Ordinal))
         {
             parsed = OperationExecutionStatus.Failed;
             return true;
         }
 
-        if (string.Equals(status, nameof(OperationExecutionStatus.Rejected), StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(status, nameof(OperationExecutionStatus.Rejected), StringComparison.Ordinal))
         {
             parsed = OperationExecutionStatus.Rejected;
             return true;

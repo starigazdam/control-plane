@@ -1,77 +1,66 @@
+using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 
-namespace ControlPlane.Api.Tests;
+namespace ControlPlane.Api.E2E;
 
 /// <summary>
-/// Checks that each fixture response shape matches the published OpenAPI contract
+/// Checks that the live fixture responses match the published OpenAPI contract
 /// without a validator package: required properties are present and carry the
-/// declared JSON types.
+/// declared JSON types. The fixture runs as a real process, so fixture drift from
+/// the published contract fails this test.
 /// </summary>
 public sealed class ExternalPluginsOpenApiTests
 {
     private static readonly JsonDocument OpenApi = LoadOpenApi();
 
-    public static IEnumerable<object[]> FixtureResponses()
+    [Fact]
+    public async Task Live_fixture_responses_match_their_openapi_schemas()
     {
-        yield return
-        [
-            "Capabilities",
-            """
-            {
-              "statusProviderIds": ["health"],
-              "operations": [
-                { "id": "ping", "displayName": "Ping", "description": "Returns a pong result.", "requiresConfirmation": false, "parameters": [] },
-                {
-                  "id": "restart",
-                  "displayName": "Restart",
-                  "description": "Restarts a named service.",
-                  "requiresConfirmation": true,
-                  "parameters": [
-                    { "name": "service", "displayName": "Service", "description": "Service to restart.", "isRequired": true, "type": "string", "defaultValue": null }
-                  ]
-                }
-              ]
-            }
-            """
-        ];
+        await using var fixture = await FixtureProcess.StartAsync("normal");
+        using var client = new HttpClient { BaseAddress = new Uri(fixture.BaseUrl) };
 
-        yield return
-        [
-            "StatusSnapshot",
-            """
-            {
-              "projectId": "placeholder",
-              "providerId": "health",
-              "overallLevel": "Healthy",
-              "observedAtUtc": "2026-01-01T00:00:00+00:00",
-              "signals": [
-                { "id": "ok", "title": "Healthy", "description": "The fabricated plugin is healthy.", "level": "Healthy", "observedAtUtc": "2026-01-01T00:00:00+00:00", "source": null, "link": null }
-              ]
-            }
-            """
-        ];
+        var schemas = OpenApi.RootElement.GetProperty("components").GetProperty("schemas");
 
-        yield return
-        [
-            "ExecuteResult",
-            """{ "status": "Succeeded", "message": "pong", "errorCode": null, "output": { "message": "pong" } }"""
-        ];
+        AssertMatches(
+            schemas.GetProperty("Capabilities"),
+            await GetJsonAsync(client, "/capabilities"),
+            schemas);
 
-        yield return
-        [
-            "ValidateResponse",
-            """["The 'service' parameter is required."]"""
-        ];
+        AssertMatches(
+            schemas.GetProperty("StatusSnapshot"),
+            await GetJsonAsync(client, "/status/health?projectId=placeholder"),
+            schemas);
+
+        var request = new { projectId = "placeholder", input = new Dictionary<string, string?>() };
+
+        var validateResponse = await client.PostAsJsonAsync("/operations/ping/validate", request);
+        Assert.Equal(HttpStatusCode.OK, validateResponse.StatusCode);
+        AssertMatches(
+            schemas.GetProperty("ValidateResponse"),
+            await ParseAsync(validateResponse),
+            schemas);
+
+        var executeResponse = await client.PostAsJsonAsync("/operations/ping/execute", request);
+        Assert.Equal(HttpStatusCode.OK, executeResponse.StatusCode);
+        AssertMatches(
+            schemas.GetProperty("ExecuteResult"),
+            await ParseAsync(executeResponse),
+            schemas);
     }
 
-    [Theory]
-    [MemberData(nameof(FixtureResponses))]
-    public void Fixture_response_matches_its_openapi_schema(string schemaName, string json)
+    private static async Task<JsonElement> GetJsonAsync(HttpClient client, string path)
     {
-        var schemas = OpenApi.RootElement.GetProperty("components").GetProperty("schemas");
-        var fixture = JsonDocument.Parse(json).RootElement;
+        using var response = await client.GetAsync(path);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await ParseAsync(response);
+    }
 
-        AssertMatches(schemas.GetProperty(schemaName), fixture, schemas);
+    private static async Task<JsonElement> ParseAsync(HttpResponseMessage response)
+    {
+        using var document = await response.Content.ReadFromJsonAsync<JsonDocument>();
+        Assert.NotNull(document);
+        return document!.RootElement.Clone();
     }
 
     private static void AssertMatches(JsonElement schema, JsonElement value, JsonElement schemas)

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using System.Net.Http;
@@ -62,6 +63,13 @@ public static class Extensions
 
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
+        // Use only a plain W3C trace-context propagator so the OpenTelemetry HTTP client
+        // instrumentation leaves header injection to the .NET runtime. The runtime then
+        // honors the bridge handler's no-output ActivityHeadersPropagator, which keeps
+        // trace and correlation headers off external plugin requests as the bridge
+        // privacy boundary requires.
+        Sdk.SetDefaultTextMapPropagator(new TraceContextPropagator());
+
         builder.Logging.AddOpenTelemetry(logging =>
         {
             logging.IncludeFormattedMessage = true;

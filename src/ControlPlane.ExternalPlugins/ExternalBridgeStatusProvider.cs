@@ -1,5 +1,6 @@
 using ControlPlane.Core.Concepts;
 using ControlPlane.Core.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace ControlPlane.ExternalPlugins;
 
@@ -16,13 +17,30 @@ internal sealed class ExternalBridgeStatusProvider : IStatusProvider
 
     private readonly StatusLevel _overallLevel;
     private readonly IReadOnlyList<StatusSignal> _signals;
+    private readonly ILogger? _logger;
+    private readonly string _pluginName;
+    private readonly string? _failureReason;
+    private int _failureLogged;
 
     public ExternalBridgeStatusProvider(ExternalPluginDiscovery discovery)
+        : this(discovery, logger: null)
+    {
+    }
+
+    public ExternalBridgeStatusProvider(ExternalPluginDiscovery discovery, ILogger? logger)
     {
         ArgumentNullException.ThrowIfNull(discovery);
 
         Id = $"{discovery.Name}.bridge";
+        _pluginName = discovery.Name;
         ObservedAtUtc = discovery.ObservedAtUtc;
+        _logger = logger;
+        _failureReason = discovery.Status switch
+        {
+            ExternalDiscoveryStatus.Unreachable => ExternalBridgeSignals.Unreachable,
+            ExternalDiscoveryStatus.InvalidCapabilities => ExternalBridgeSignals.InvalidCapabilities,
+            _ => null
+        };
         (_overallLevel, _signals) = BuildOutcome(discovery);
     }
 
@@ -33,12 +51,26 @@ internal sealed class ExternalBridgeStatusProvider : IStatusProvider
     public Task<StatusSnapshot> GetStatusAsync(Project project, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(project);
+        LogDiscoveryFailureOnce();
         return Task.FromResult(new StatusSnapshot(
             project.Id,
             Id,
             _overallLevel,
             ObservedAtUtc,
             _signals));
+    }
+
+    private void LogDiscoveryFailureOnce()
+    {
+        if (_failureReason is null || _logger is null || Interlocked.Exchange(ref _failureLogged, 1) != 0)
+        {
+            return;
+        }
+
+        _logger.LogWarning(
+            "External plugin '{PluginName}' discovery failed: {Reason}.",
+            _pluginName,
+            _failureReason);
     }
 
     private static (StatusLevel Level, IReadOnlyList<StatusSignal> Signals) BuildOutcome(
@@ -79,10 +111,11 @@ internal sealed class ExternalBridgeStatusProvider : IStatusProvider
         }
 
         var signals = new List<StatusSignal>(discovery.Exclusions.Count);
-        foreach (var exclusion in discovery.Exclusions)
+        for (var index = 0; index < discovery.Exclusions.Count; index++)
         {
+            var exclusion = discovery.Exclusions[index];
             signals.Add(new StatusSignal(
-                $"excluded-{exclusion.Kind}-{exclusion.Identifier}",
+                $"excluded-{exclusion.Kind}-{exclusion.Identifier}-{index}",
                 "External capability was excluded",
                 exclusion.Reason,
                 StatusLevel.Warning,

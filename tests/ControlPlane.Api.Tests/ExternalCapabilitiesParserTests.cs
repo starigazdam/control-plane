@@ -150,6 +150,27 @@ public sealed class ExternalCapabilitiesParserTests
     }
 
     [Fact]
+    public void Duplicate_operation_ids_exclude_both_entries_even_when_one_is_malformed()
+    {
+        var result = ExternalCapabilitiesParser.Parse("""
+            {
+              "statusProviderIds": [],
+              "operations": [
+                { "id": "ping" },
+                { "id": "ping", "displayName": "Ping" }
+              ]
+            }
+            """);
+
+        Assert.Empty(result.Operations);
+        var duplicates = result.Exclusions
+            .Where(exclusion => exclusion.Kind == "operation" && exclusion.Identifier == "ping")
+            .ToArray();
+        Assert.Equal(2, duplicates.Length);
+        Assert.All(duplicates, exclusion => Assert.Contains("more than once", exclusion.Reason));
+    }
+
+    [Fact]
     public void Operation_with_invalid_grammar_id_is_excluded()
     {
         var result = ExternalCapabilitiesParser.Parse("""

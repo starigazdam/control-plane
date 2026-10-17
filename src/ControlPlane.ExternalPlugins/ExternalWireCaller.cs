@@ -50,13 +50,29 @@ internal sealed class ExternalWireCaller
         try
         {
             using var response = await send(client, timeoutSource.Token).ConfigureAwait(false);
-            var body = await response.Content.ReadAsStringAsync(timeoutSource.Token).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
             {
                 return ExternalCallOutcome.Failure(
                     ExternalOperationErrorCodes.UnexpectedStatus,
                     $"The external plugin returned HTTP {(int)response.StatusCode}.");
+            }
+
+            string body;
+            try
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync(timeoutSource.Token).ConfigureAwait(false);
+                body = Encoding.UTF8.GetString(bytes);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                return ExternalCallOutcome.Failure(
+                    ExternalOperationErrorCodes.InvalidResponse,
+                    "The external plugin response body could not be read.");
             }
 
             return ExternalCallOutcome.Success(body);
@@ -71,11 +87,11 @@ internal sealed class ExternalWireCaller
                 ExternalOperationErrorCodes.Timeout,
                 "The external operation call timed out.");
         }
-        catch (HttpRequestException exception)
+        catch (HttpRequestException)
         {
             return ExternalCallOutcome.Failure(
                 ExternalOperationErrorCodes.TransportFailed,
-                $"The external operation call failed at the transport layer: {exception.Message}");
+                "The external operation call failed at the transport layer.");
         }
     }
 }

@@ -37,10 +37,8 @@ internal sealed class FixtureProcess : IAsyncDisposable, IDisposable
             throw new InvalidOperationException($"Fixture assembly not found at '{fixturePath}'.");
         }
 
-        var startInfo = new ProcessStartInfo("dotnet")
+        var startInfo = new ProcessStartInfo(RuntimePath())
         {
-            RedirectStandardError = true,
-            RedirectStandardOutput = true,
             UseShellExecute = false
         };
         startInfo.ArgumentList.Add(fixturePath);
@@ -73,7 +71,7 @@ internal sealed class FixtureProcess : IAsyncDisposable, IDisposable
             if (_process.HasExited)
             {
                 throw new InvalidOperationException(
-                    $"The fixture process exited early with code {_process.ExitCode}: {await ReadErrorAsync().ConfigureAwait(false)}");
+                    $"The fixture process exited early with code {_process.ExitCode}.");
             }
 
             try
@@ -94,16 +92,12 @@ internal sealed class FixtureProcess : IAsyncDisposable, IDisposable
         throw new TimeoutException("The fixture process did not become ready in time.");
     }
 
-    private async Task<string> ReadErrorAsync()
+    private static string RuntimePath()
     {
-        try
-        {
-            return await _process.StandardError.ReadToEndAsync().ConfigureAwait(false);
-        }
-        catch (Exception)
-        {
-            return string.Empty;
-        }
+        var processPath = Environment.ProcessPath;
+        return processPath is not null && processPath.EndsWith("dotnet", StringComparison.OrdinalIgnoreCase)
+            ? processPath
+            : "dotnet";
     }
 
     private static int GetFreePort()

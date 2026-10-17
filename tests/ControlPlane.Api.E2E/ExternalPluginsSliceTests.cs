@@ -22,7 +22,9 @@ public sealed class ExternalPluginsSliceTests
 
         var snapshots = await GetSnapshotsAsync(client);
         Assert.Contains("sample.health", snapshots.Select(snapshot => snapshot.GetProperty("providerId").GetString()));
-        Assert.Contains("sample.bridge", snapshots.Select(snapshot => snapshot.GetProperty("providerId").GetString()));
+        var bridge = snapshots.Single(snapshot => snapshot.GetProperty("providerId").GetString() == "sample.bridge");
+        Assert.Equal("Healthy", bridge.GetProperty("overallLevel").GetString());
+        Assert.Empty(bridge.GetProperty("signals").EnumerateArray());
 
         var operations = await GetOperationsAsync(client);
         var restart = operations.Single(operation => operation.GetProperty("id").GetString() == "sample.restart");

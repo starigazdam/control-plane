@@ -403,9 +403,10 @@ process, or startup discovery. It is still useful for focused unit tests.
 
 ## Migration Plan
 
-No database migration is required. Add a committed placeholder for the external
-plugin configuration with an empty plugin list. An empty list registers no
-external plugins and changes no existing behavior. The implementation adds the
+No database migration is required. No external-plugin configuration placeholder
+is committed: an absent `ExternalPlugins` section registers no external plugins
+and changes no existing behavior, and operators add the section through
+environment variables or a local, gitignored override. The implementation adds the
 `ControlPlane.ExternalPlugins` project and updates the registration contract and
 the built-in plugins in one coordinated change. Deployment and activation
 against live plugins are outside this proposal. Sequence the implementation
@@ -468,3 +469,10 @@ behavior. They are normative for the implementation.
   into `ControlPlane.Core` or editing each plugin's project file.
 - The fabricated plugin exposes the modes `normal`, `slow-execute`,
   `invalid-capabilities`, `excluded-id`, and `invalid-validate`.
+- `ControlPlane.ServiceDefaults` sets the OpenTelemetry default text-map
+  propagator to a plain `TraceContextPropagator`
+  (`Sdk.SetDefaultTextMapPropagator`) so the HTTP client instrumentation leaves
+  header injection to the .NET runtime, which honors the bridge's no-output
+  `ActivityHeadersPropagator`; as a side effect OpenTelemetry no longer injects
+  `baggage`, while runtime W3C `traceparent` propagation for other clients is
+  unchanged.

@@ -2,6 +2,7 @@ using ControlPlane.Core.Interfaces;
 using ControlPlane.Core.Plugins;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ControlPlane.ExternalPlugins;
 
@@ -52,7 +53,9 @@ public sealed class ExternalPluginsPlugin : IControlPlanePlugin, IPluginServiceR
     {
         foreach (var discovery in _discoveries)
         {
-            registration.AddStatusProvider(new ExternalBridgeStatusProvider(discovery));
+            registration.AddStatusProvider(serviceProvider => new ExternalBridgeStatusProvider(
+                discovery,
+                serviceProvider.GetService<ILogger<ExternalBridgeStatusProvider>>()));
 
             if (discovery.Status != ExternalDiscoveryStatus.Succeeded)
             {

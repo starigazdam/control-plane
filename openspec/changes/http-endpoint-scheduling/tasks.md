@@ -9,9 +9,15 @@
 - [ ] 1.5 Obtain independent high-capability review of the exact proposal revision and resolve blocking findings.
 - [ ] 1.6 Obtain explicit human design approval before any implementation request.
 
-## 2. Explicit exclusions
+## 2. Reconcile prerequisites before implementation
 
-- [ ] No runtime or test-code changes in this proposal-only change.
-- [ ] No CI changes, dependency changes, deployment, or live endpoint calls.
-- [ ] Do not begin implementation without separate explicit authorization.
-- [ ] Keep POST and response-body assertions out of scope; POST remains tracked by issue #62.
+- [ ] 2.1 Before any implementation, reconcile and archive the manual-check OpenSpec change (`http-endpoint-checks`) into the baseline.
+- [ ] 2.2 After that reconciliation, update the manual change's overview and status requirements to apply to manual-only endpoints, remove its temporary schedule-ignored requirement, and make this delta's scheduled-endpoint requirements explicit modifications.
+- [ ] 2.3 Keep this proposal active and unarchived until implementation is separately authorized.
+
+## 3. Explicit exclusions
+
+- [ ] 3.1 No runtime or test-code changes in this proposal-only change.
+- [ ] 3.2 No CI changes, dependency changes, deployment, or live endpoint calls.
+- [ ] 3.3 Do not begin implementation without separate explicit authorization.
+- [ ] 3.4 Keep POST and response-body assertions out of scope; POST remains tracked by issue #62.

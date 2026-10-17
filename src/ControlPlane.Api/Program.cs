@@ -6,6 +6,7 @@ using ControlPlane.Api.Services;
 using ControlPlane.Azure;
 using ControlPlane.CopilotAgent;
 using ControlPlane.DevOps;
+using ControlPlane.HttpEndpoint;
 using ControlPlane.Kafka;
 using ControlPlane.ServiceBus;
 using DotNetEnv;
@@ -64,6 +65,7 @@ builder.Services.AddControlPlanePlugins(
     typeof(KafkaPlugin).Assembly,
     typeof(DevOpsPlugin).Assembly,
     typeof(ServiceBusPlugin).Assembly,
+    typeof(HttpEndpointPlugin).Assembly,
     typeof(CopilotAgentPlugin).Assembly);
 builder.Services.AddDbContext<ControlPlaneDbContext>(options =>
 {

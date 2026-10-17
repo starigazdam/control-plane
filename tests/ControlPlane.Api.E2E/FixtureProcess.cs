@@ -11,6 +11,7 @@ namespace ControlPlane.Api.E2E;
 /// </summary>
 internal sealed class FixtureProcess : IAsyncDisposable, IDisposable
 {
+    private const int MaxStartAttempts = 10;
     private readonly Process _process;
     private readonly HttpClient _probe = new() { Timeout = TimeSpan.FromSeconds(2) };
     private bool _disposed;
@@ -27,7 +28,6 @@ internal sealed class FixtureProcess : IAsyncDisposable, IDisposable
 
     public static async Task<FixtureProcess> StartAsync(string mode)
     {
-        var port = GetFreePort();
         var fixturePath = Path.Combine(
             AppContext.BaseDirectory,
             "ControlPlane.ExternalPlugins.Fixture.dll");
@@ -37,6 +37,21 @@ internal sealed class FixtureProcess : IAsyncDisposable, IDisposable
             throw new InvalidOperationException($"Fixture assembly not found at '{fixturePath}'.");
         }
 
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await StartOnceAsync(fixturePath, mode).ConfigureAwait(false);
+            }
+            catch (InvalidOperationException) when (attempt < MaxStartAttempts)
+            {
+            }
+        }
+    }
+
+    private static async Task<FixtureProcess> StartOnceAsync(string fixturePath, string mode)
+    {
+        var port = GetFreePort();
         var startInfo = new ProcessStartInfo(RuntimePath())
         {
             UseShellExecute = false
